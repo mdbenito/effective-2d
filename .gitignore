@@ -3,3 +3,5 @@
 *.pvd
 *.vtu
 *.h5
+
+*.pickle

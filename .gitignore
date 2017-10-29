@@ -5,3 +5,9 @@
 *.h5
 
 *.pickle
+
+__pycache__/
+
+output/
+
+\.idea/

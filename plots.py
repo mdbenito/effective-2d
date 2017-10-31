@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from dolfin import plot
+from dolfin import plot, norm
 import numpy as np
 import matplotlib.pyplot as pl
 

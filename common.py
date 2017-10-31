@@ -193,7 +193,7 @@ def save_results(results: list, results_file: str):
 def generate_mesh(kind:str, m:int, n:int) -> str:
     """ (Cached) Generates a mesh, saves it to a file and returns the file name
      """
-    mesh_file = 'mesh-%dx%d-%s' % (m, n, kind)
+    mesh_file = 'mesh-%dx%d-%s.xml.gz' % (m, n, kind)
 
     if not os.path.isfile(mesh_file):
         if kind.lower() == 'circle':

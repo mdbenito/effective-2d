@@ -1,0 +1,231 @@
+# # Problem definition
+# 
+# We wish to minimize
+# $$ I(u,v) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} \nabla v \otimes \nabla v|^{2} \mathrm{d}x
+#    + \frac{1}{24} \int_{\omega} |\nabla^2 v - \mathrm{Id}|^{2} \mathrm{d}x. $$
+# 
+# Because we only have $C^0$ elements we set $z$ for $\nabla v$ and minimize instead
+# 
+# $$ J(u,z) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} z \otimes z|^{2} \mathrm{d}x 
+#           + \frac{1}{24} \int_{\omega} |\nabla z - \mathrm{Id}|^{2} \mathrm{d}x 
+#           + \mu \int_{\omega} |\mathrm{curl}\ z|^{2} \mathrm{d}x. $$
+# 
+# We use a mixed function space $V \times Z$ to recover the vertical displacements.
+# Minimization of the energy functional $J$ is done via gradient descent and a line search.
+
+from dolfin import *
+import numpy as np
+import os
+from tqdm import tqdm
+from common import make_initial_data_mixed, circular_symmetry, save_results
+
+
+def run_model(init:str, theta:float, mu:float = 0.0,
+              e_stop_mult:float=1e-5, max_steps:int=400, fname_prefix:str="descent-mixed",
+              save_funs:bool=True, n=0):
+    """ Note that the Mesh cannot be an argument if we want this to run with joblib because
+    Swig objects are not pickl'able, so we rely on a global variable.
+    """
+
+    t = tqdm(total=max_steps, desc='th=%7.2f' % theta, position=n, dynamic_ncols=True)
+
+    def noop(*args, **kwargs):
+        pass
+    def tout(s, **kwargs):
+        """ FIXME: Does not work as intended... """
+        t.write(s, end='')
+    debug = noop
+    #debug = print
+
+    # in plane displacements (IPD)
+    UE = VectorElement("Lagrange", msh.ufl_cell(), 2, dim=2)
+    # out of plane displacements (OPD)
+    VE = FiniteElement("Lagrange", msh.ufl_cell(), 2)
+    # Gradients of OPD
+    ZE = VectorElement("Lagrange", msh.ufl_cell(), 2, dim=2)
+    ME = MixedElement([UE, VE, ZE])
+    W = FunctionSpace(msh, ME)
+
+    # We gather in-plane and out-of-plane displacements into one
+    # Function for visualization with ParaView.
+    P = VectorFunctionSpace(msh, "Lagrange", 2, dim=3)
+    fax = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
+    fay = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
+    faz = FunctionAssigner(P.sub(2), W.sub(1))
+
+    disp = Function(P)
+    disp.rename("disp", "displacement")
+
+    dir = "output-mixed/" + fname_prefix.strip('-')
+    try:
+        os.mkdir(dir)
+    except:
+        pass
+
+    file = File(dir + "/" + fname_prefix + ".pvd")  # .vtu files will have the same prefix
+
+    w = Function(W)
+    w_ = Function(W)
+    u, v, z  = w.split()
+    u_, v_, z_ = w_.split()
+
+    w_init = make_initial_data_mixed(init)
+    w.interpolate(w_init)
+    w_.interpolate(w_init)
+
+    def eps(u):
+        return (grad(u) + grad(u).T)/2.0
+
+    e_stop = msh.hmin()*e_stop_mult
+    max_line_search_steps = 20
+    step = 0
+    omega = 0.25   # Gradient descent fudge factor in (0, 1/2)
+    _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop' : e_stop,
+             'J':[], 'alpha':[], 'du':[], 'dv':[], 'dz':[], 'constraint':[],
+             'symmetry':[]}
+
+    Id = Identity(2)
+    zero_energy = assemble((1./24)*inner(Id, Id)*dx(msh))
+    def energy(u, v, z, mu=mu):
+        J = (theta/2)*inner(eps(u)+outer(grad(v), grad(v))/2, 
+                            eps(u)+outer(grad(v), grad(v))/2)*dx(msh) \
+            + (1./24)*inner(grad(z) - Id, grad(z) - Id)*dx(msh) \
+            + (1./2)*mu*inner(z - grad(v), z - grad(v))*dx
+        return assemble(J)
+
+    phi, psi, eta = TestFunctions(W)
+    # CAREFUL!! Picking the right scalar product here is essential
+    # Recall the issues with boundary values: integrate partially
+    # and only boundary terms survive...
+    dtu, dtv, dtz = TrialFunctions(W)
+    L = inner(dtu, phi)*dx + inner(grad(dtu), grad(phi))*dx \
+        + inner(dtv, psi)*dx + inner(grad(dtv), grad(psi))*dx \
+        + inner(dtz, eta)*dx + inner(grad(dtz), grad(eta))*dx
+
+    dw = Function(W)
+    du, dv, dz = dw.split()
+
+    # Output initial condition
+    fax.assign(disp.sub(0), u.sub(0))
+    fay.assign(disp.sub(1), u.sub(1))
+    faz.assign(disp.sub(2), v)
+
+    file << (disp, float(step))
+
+    cur_energy = energy(u, v, z)
+    alpha = ndu = ndv = ndz = 1.0
+
+    debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps." 
+          % (theta, mu, e_stop, max_steps))
+
+    # FIXME: check whether it makes sense to add ndz**2 here and below
+    begin = time.time()
+    while alpha*(ndu**2+ndv**2+ndz**2) > e_stop and step < max_steps:
+        _constraint = assemble(inner(grad(v_) - z_, grad(v_) - z_) * dx)
+        _symmetry = circular_symmetry(disp)
+        _hist['constraint'].append(_constraint)
+        _hist['symmetry'].append(_symmetry)
+        debug("Step %d, energy = %.3e, |grad v - z| = %.3e, symmetry = %.3f"
+              % (step, cur_energy, _constraint, _symmetry))
+
+        #### Gradient
+        dJ = theta * inner(eps(u_) + outer(grad(v_), grad(v_))/2, eps(phi))*dx(msh) \
+            + theta * inner(eps(u_) + outer(grad(v_), grad(v_))/2,
+                            outer(grad(v_), grad(psi)))*dx(msh) \
+            + (1./12)*inner(grad(z_) - Id, grad(eta))*dx(msh) \
+            + mu*inner(grad(v_) - z_, grad(psi))*dx(msh) \
+            + mu*inner(z_ - grad(v_), eta)*dx(msh)
+
+        debug("\tSolving...", end='')
+        solve(L == -dJ, dw, [])
+
+        du, dv, dz = dw.split()
+        # dw is never reassigned to a new object so it should be ok
+        # to reuse du, dv without resplitting
+        ndu = norm(du)
+        ndv = norm(dv)
+        ndz = norm(dz)
+
+        debug(" done with |du| = %.3f, |dv| = %.3f, |dz| = %.3f" % (ndu, ndv, ndz))
+
+        #### Line search
+        debug("\tSearching... ", end='')
+        while True:
+            w = project(w_ + alpha*dw, W)
+            u, v, z = w.split()
+            new_energy = energy(u, v, z)
+            if new_energy <= cur_energy - omega*alpha*(ndu**2+ndv**2+ndz**2):
+                debug(" alpha = %.2e" % alpha)
+                _hist['J'].append(cur_energy)
+                _hist['alpha'].append(alpha)
+                _hist['du'].append(ndu)
+                _hist['dv'].append(ndv)
+                _hist['dz'].append(ndz) 
+                cur_energy = new_energy
+                alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
+                break
+            if alpha < (1./2)**max_line_search_steps:
+                # If this happens, it's unlikely that we had computed an actual gradient
+                raise Exception("Line search failed after %d steps" % max_line_search_steps)
+            alpha /= 2.0  # Repeat with smaller alpha
+
+        step += 1
+
+        #### Write displacements to file
+        debug("\tSaving... ", end='')
+        fax.assign(disp.sub(0), u.sub(0))
+        fay.assign(disp.sub(1), u.sub(1))
+        faz.assign(disp.sub(2), v)
+        file << (disp, float(step))
+        debug("Done.")
+
+        w_.vector()[:] = w.vector()
+        u_, v_, z_ = w_.split()
+        t.update()
+
+    _hist['time'] = time.time() - begin
+
+    if step < max_steps:
+        t.total = step
+        t.update()
+
+    _hist['steps'] = step
+    if save_funs:
+        _hist['disp'] = disp
+        _hist['u'] = u
+        _hist['v'] = v
+        _hist['z'] = z
+        _hist['dtu'] = du
+        _hist['dtv'] = dv
+        _hist['dtz'] = dz
+    debug("Done after %d steps" % step)
+
+    #t.close()
+    return _hist
+
+
+if __name__ == 'main':
+
+    from joblib import Parallel, delayed
+    import mshr
+
+    parameters["form_compiler"]["optimize"] = True
+    parameters["form_compiler"]["cpp_optimize"] = True
+
+    set_log_level(ERROR)
+
+    domain = mshr.Circle(Point(0.0, 0.0), 1, 18)
+    msh = mshr.generate_mesh(domain, 18)
+
+    theta_values = np.arange(0.0, 20.0, 1.0, dtype=float)
+
+    # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
+    n_jobs = min(2, len(theta_values))
+
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', theta=theta, mu=1.0,
+                                                         fname_prefix='ani-parab-%07.2f-' % theta,
+                                                         max_steps=10000, save_funs=False,
+                                                         e_stop_mult=1e-9, n=n)
+                                      for n, theta in enumerate(theta_values))
+
+    save_results(new_res, "results-mixed-combined.pickle")

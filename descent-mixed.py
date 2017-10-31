@@ -1,15 +1,13 @@
 from dolfin import *
 import numpy as np
 import os
-from joblib import Parallel, delayed
-import mshr
+from common import make_initial_data_mixed, circular_symmetry, save_results
+from time import time
 
 # nbimporter has stopped working!
 # This sucks...
 #import nbimporter
 #from descent_mixed import run_model as mixed_model
-
-from common import generate_mesh
 
 
 def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
@@ -202,6 +200,8 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
 
 if __name__ == 'main':
 
+    from joblib import Parallel, delayed
+
     set_log_level(ERROR)
 
     parameters["form_compiler"]["optimize"] = True
@@ -214,7 +214,7 @@ if __name__ == 'main':
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(mixed_model)('ani_parab', mesh_file, theta=theta, mu=1.0,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', mesh_file, theta=theta, mu=1.0,
                                                          fname_prefix='ani-parab-%07.2f-' % theta,
                                                          max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-9, n=n)

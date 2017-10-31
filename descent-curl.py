@@ -28,14 +28,16 @@ import numpy as np
 import os
 from tqdm import tqdm
 from common import make_initial_data_penalty, circular_symmetry, compute_potential, save_results
+from time import time
 
+def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
+              e_stop_mult: float = 1e-6, max_steps: int = 1000,
+              fname_prefix: str = "descent-curl", save_funs: bool = False, n = 0):
+    """
+    """
 
-def run_model(init: str, theta: float, mu: float = 0.0,
-              e_stop_mult: float = 1e-5, max_steps: int = 400, fname_prefix: str = "descent-curl",
-              save_funs: bool = True, n=0):
-    """
-    
-    """
+    msh = Mesh(mesh_file)
+
     t = tqdm(total=max_steps, desc='th=% 7.2f' % theta, position=n, dynamic_ncols=True)
 
     # debug = print
@@ -134,7 +136,7 @@ def run_model(init: str, theta: float, mu: float = 0.0,
 
     debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
           % (theta, mu, e_stop, max_steps))
-    begin = time.time()
+    begin = time()
     while alpha * (ndu ** 2 + ndv ** 2) > e_stop and step < max_steps:
         _curl = assemble(curl(v_) * dx)
         _symmetry = circular_symmetry(disp)
@@ -194,7 +196,7 @@ def run_model(init: str, theta: float, mu: float = 0.0,
         u_, v_ = w_.split()
         t.update()
 
-    _hist['time'] = time.time() - begin
+    _hist['time'] = time() - begin
 
     if step < max_steps:
         t.total = step
@@ -216,16 +218,14 @@ def run_model(init: str, theta: float, mu: float = 0.0,
 if __name__ == "__main__":
 
     from joblib import Parallel, delayed
-    import mshr
 
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
     set_log_level(ERROR)
 
-    domain = mshr.Circle(Point(0.0, 0.0), 1, 18)
-    msh = mshr.generate_mesh(domain, 18)
-
+    results_file = "results-combined.pickle"
+    mesh_file = generate_mesh('circle', 18, 18)
     theta_values = np.arange(8.7, 8.8, 0.1, dtype=float)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
@@ -237,4 +237,4 @@ if __name__ == "__main__":
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))
 
-    save_results(new_res, "results-combined.pickle")
+    save_results(new_res, results_file)

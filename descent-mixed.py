@@ -1,41 +1,36 @@
-# # Problem definition
-# 
-# We wish to minimize
-# $$ I(u,v) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} \nabla v \otimes \nabla v|^{2} \mathrm{d}x
-#    + \frac{1}{24} \int_{\omega} |\nabla^2 v - \mathrm{Id}|^{2} \mathrm{d}x. $$
-# 
-# Because we only have $C^0$ elements we set $z$ for $\nabla v$ and minimize instead
-# 
-# $$ J(u,z) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} z \otimes z|^{2} \mathrm{d}x 
-#           + \frac{1}{24} \int_{\omega} |\nabla z - \mathrm{Id}|^{2} \mathrm{d}x 
-#           + \mu \int_{\omega} |\mathrm{curl}\ z|^{2} \mathrm{d}x. $$
-# 
-# We use a mixed function space $V \times Z$ to recover the vertical displacements.
-# Minimization of the energy functional $J$ is done via gradient descent and a line search.
-
 from dolfin import *
 import numpy as np
 import os
-from tqdm import tqdm
-from common import make_initial_data_mixed, circular_symmetry, save_results
+from joblib import Parallel, delayed
+import mshr
+
+# nbimporter has stopped working!
+# This sucks...
+#import nbimporter
+#from descent_mixed import run_model as mixed_model
+
+from common import generate_mesh
 
 
-def run_model(init:str, theta:float, mu:float = 0.0,
-              e_stop_mult:float=1e-5, max_steps:int=400, fname_prefix:str="descent-mixed",
-              save_funs:bool=True, n=0):
-    """ Note that the Mesh cannot be an argument if we want this to run with joblib because
-    Swig objects are not pickl'able, so we rely on a global variable.
+def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
+              e_stop_mult: float = 1e-6, max_steps: int = 1000,
+              fname_prefix: str = "descent-mixed", save_funs: bool = False, n = 0):
     """
+    """
+
+    msh = Mesh(mesh_file)
 
     t = tqdm(total=max_steps, desc='th=%7.2f' % theta, position=n, dynamic_ncols=True)
 
     def noop(*args, **kwargs):
         pass
+
     def tout(s, **kwargs):
         """ FIXME: Does not work as intended... """
         t.write(s, end='')
+
     debug = noop
-    #debug = print
+    # debug = print
 
     # in plane displacements (IPD)
     UE = VectorElement("Lagrange", msh.ufl_cell(), 2, dim=2)
@@ -66,7 +61,7 @@ def run_model(init:str, theta:float, mu:float = 0.0,
 
     w = Function(W)
     w_ = Function(W)
-    u, v, z  = w.split()
+    u, v, z = w.split()
     u_, v_, z_ = w_.split()
 
     w_init = make_initial_data_mixed(init)
@@ -74,23 +69,24 @@ def run_model(init:str, theta:float, mu:float = 0.0,
     w_.interpolate(w_init)
 
     def eps(u):
-        return (grad(u) + grad(u).T)/2.0
+        return (grad(u) + grad(u).T) / 2.0
 
-    e_stop = msh.hmin()*e_stop_mult
+    e_stop = msh.hmin() * e_stop_mult
     max_line_search_steps = 20
     step = 0
-    omega = 0.25   # Gradient descent fudge factor in (0, 1/2)
-    _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop' : e_stop,
-             'J':[], 'alpha':[], 'du':[], 'dv':[], 'dz':[], 'constraint':[],
-             'symmetry':[]}
+    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
+    _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
+             'J': [], 'alpha': [], 'du': [], 'dv': [], 'dz': [], 'constraint': [],
+             'symmetry': []}
 
     Id = Identity(2)
-    zero_energy = assemble((1./24)*inner(Id, Id)*dx(msh))
+    zero_energy = assemble((1. / 24) * inner(Id, Id) * dx(msh))
+
     def energy(u, v, z, mu=mu):
-        J = (theta/2)*inner(eps(u)+outer(grad(v), grad(v))/2, 
-                            eps(u)+outer(grad(v), grad(v))/2)*dx(msh) \
-            + (1./24)*inner(grad(z) - Id, grad(z) - Id)*dx(msh) \
-            + (1./2)*mu*inner(z - grad(v), z - grad(v))*dx
+        J = (theta / 2) * inner(eps(u) + outer(grad(v), grad(v)) / 2,
+                                eps(u) + outer(grad(v), grad(v)) / 2) * dx(msh) \
+            + (1. / 24) * inner(grad(z) - Id, grad(z) - Id) * dx(msh) \
+            + (1. / 2) * mu * inner(z - grad(v), z - grad(v)) * dx
         return assemble(J)
 
     phi, psi, eta = TestFunctions(W)
@@ -98,9 +94,9 @@ def run_model(init:str, theta:float, mu:float = 0.0,
     # Recall the issues with boundary values: integrate partially
     # and only boundary terms survive...
     dtu, dtv, dtz = TrialFunctions(W)
-    L = inner(dtu, phi)*dx + inner(grad(dtu), grad(phi))*dx \
-        + inner(dtv, psi)*dx + inner(grad(dtv), grad(psi))*dx \
-        + inner(dtz, eta)*dx + inner(grad(dtz), grad(eta))*dx
+    L = inner(dtu, phi) * dx + inner(grad(dtu), grad(phi)) * dx \
+        + inner(dtv, psi) * dx + inner(grad(dtv), grad(psi)) * dx \
+        + inner(dtz, eta) * dx + inner(grad(dtz), grad(eta)) * dx
 
     dw = Function(W)
     du, dv, dz = dw.split()
@@ -115,12 +111,12 @@ def run_model(init:str, theta:float, mu:float = 0.0,
     cur_energy = energy(u, v, z)
     alpha = ndu = ndv = ndz = 1.0
 
-    debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps." 
+    debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
           % (theta, mu, e_stop, max_steps))
 
     # FIXME: check whether it makes sense to add ndz**2 here and below
-    begin = time.time()
-    while alpha*(ndu**2+ndv**2+ndz**2) > e_stop and step < max_steps:
+    begin = time()
+    while alpha * (ndu ** 2 + ndv ** 2 + ndz ** 2) > e_stop and step < max_steps:
         _constraint = assemble(inner(grad(v_) - z_, grad(v_) - z_) * dx)
         _symmetry = circular_symmetry(disp)
         _hist['constraint'].append(_constraint)
@@ -129,12 +125,12 @@ def run_model(init:str, theta:float, mu:float = 0.0,
               % (step, cur_energy, _constraint, _symmetry))
 
         #### Gradient
-        dJ = theta * inner(eps(u_) + outer(grad(v_), grad(v_))/2, eps(phi))*dx(msh) \
-            + theta * inner(eps(u_) + outer(grad(v_), grad(v_))/2,
-                            outer(grad(v_), grad(psi)))*dx(msh) \
-            + (1./12)*inner(grad(z_) - Id, grad(eta))*dx(msh) \
-            + mu*inner(grad(v_) - z_, grad(psi))*dx(msh) \
-            + mu*inner(z_ - grad(v_), eta)*dx(msh)
+        dJ = theta * inner(eps(u_) + outer(grad(v_), grad(v_)) / 2, eps(phi)) * dx(msh) \
+             + theta * inner(eps(u_) + outer(grad(v_), grad(v_)) / 2,
+                             outer(grad(v_), grad(psi))) * dx(msh) \
+             + (1. / 12) * inner(grad(z_) - Id, grad(eta)) * dx(msh) \
+             + mu * inner(grad(v_) - z_, grad(psi)) * dx(msh) \
+             + mu * inner(z_ - grad(v_), eta) * dx(msh)
 
         debug("\tSolving...", end='')
         solve(L == -dJ, dw, [])
@@ -151,20 +147,20 @@ def run_model(init:str, theta:float, mu:float = 0.0,
         #### Line search
         debug("\tSearching... ", end='')
         while True:
-            w = project(w_ + alpha*dw, W)
+            w = project(w_ + alpha * dw, W)
             u, v, z = w.split()
             new_energy = energy(u, v, z)
-            if new_energy <= cur_energy - omega*alpha*(ndu**2+ndv**2+ndz**2):
+            if new_energy <= cur_energy - omega * alpha * (ndu ** 2 + ndv ** 2 + ndz ** 2):
                 debug(" alpha = %.2e" % alpha)
                 _hist['J'].append(cur_energy)
                 _hist['alpha'].append(alpha)
                 _hist['du'].append(ndu)
                 _hist['dv'].append(ndv)
-                _hist['dz'].append(ndz) 
+                _hist['dz'].append(ndz)
                 cur_energy = new_energy
                 alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
                 break
-            if alpha < (1./2)**max_line_search_steps:
+            if alpha < (1. / 2) ** max_line_search_steps:
                 # If this happens, it's unlikely that we had computed an actual gradient
                 raise Exception("Line search failed after %d steps" % max_line_search_steps)
             alpha /= 2.0  # Repeat with smaller alpha
@@ -183,7 +179,7 @@ def run_model(init:str, theta:float, mu:float = 0.0,
         u_, v_, z_ = w_.split()
         t.update()
 
-    _hist['time'] = time.time() - begin
+    _hist['time'] = time() - begin
 
     if step < max_steps:
         t.total = step
@@ -200,32 +196,28 @@ def run_model(init:str, theta:float, mu:float = 0.0,
         _hist['dtz'] = dz
     debug("Done after %d steps" % step)
 
-    #t.close()
+    # t.close()
     return _hist
 
 
 if __name__ == 'main':
 
-    from joblib import Parallel, delayed
-    import mshr
+    set_log_level(ERROR)
 
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
-    set_log_level(ERROR)
-
-    domain = mshr.Circle(Point(0.0, 0.0), 1, 18)
-    msh = mshr.generate_mesh(domain, 18)
-
-    theta_values = np.arange(0.0, 20.0, 1.0, dtype=float)
+    results_file = "results-mixed-combined.pickle"
+    mesh_file = generate_mesh('circle', 18, 18)
+    theta_values = np.arange(39.0, 40.0, 1.0, dtype=float)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', theta=theta, mu=1.0,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(mixed_model)('ani_parab', mesh_file, theta=theta, mu=1.0,
                                                          fname_prefix='ani-parab-%07.2f-' % theta,
                                                          max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-9, n=n)
                                       for n, theta in enumerate(theta_values))
 
-    save_results(new_res, "results-mixed-combined.pickle")
+    save_results(new_res, results_file)

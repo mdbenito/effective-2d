@@ -32,7 +32,7 @@ from time import time
 
 def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
               e_stop_mult: float = 1e-6, max_steps: int = 1000,
-              fname_prefix: str = "descent-curl", save_funs: bool = False, n = 0):
+              save_funs: bool = False, n = 0):
     """
     """
 
@@ -74,13 +74,15 @@ def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
     disp = Function(P)
     disp.rename("disp", "displacement")
 
+    fname_prefix = "%s-%07.2f-%05.2f-" % (init, theta, mu)
     dir = "output/" + fname_prefix.strip('-')
     try:
         os.mkdir(dir)
     except:
         pass
 
-    file = File(dir + "/" + fname_prefix + ".pvd")  # .vtu files will have the same prefix
+    file_name = dir + "/" + fname_prefix + ".pvd"
+    file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)
     w_ = Function(W)
@@ -100,7 +102,7 @@ def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
     _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'curl': [],
-             'symmetry': []}
+             'symmetry': [], 'file_name': file_name}
 
     Id = Identity(2)
     zero_energy = assemble((1. / 24) * inner(Id, Id) * dx(msh))
@@ -232,7 +234,6 @@ if __name__ == "__main__":
     n_jobs = min(2, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', theta=theta, mu=0.0,
-                                                         fname_prefix='ani-parab-%07.2f-' % theta,
                                                          max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))

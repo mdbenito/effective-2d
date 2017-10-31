@@ -1,7 +1,8 @@
 from dolfin import *
 import numpy as np
 import os
-from common import make_initial_data_mixed, circular_symmetry, save_results
+from tqdm import tqdm
+from common import make_initial_data_mixed, circular_symmetry, save_results, generate_mesh
 from time import time
 
 # nbimporter has stopped working!
@@ -11,8 +12,7 @@ from time import time
 
 
 def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
-              e_stop_mult: float = 1e-6, max_steps: int = 1000,
-              fname_prefix: str = "descent-mixed", save_funs: bool = False, n = 0):
+              e_stop_mult: float = 1e-6, max_steps: int = 1000, save_funs: bool = False, n = 0):
     """
     """
 
@@ -49,13 +49,15 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     disp = Function(P)
     disp.rename("disp", "displacement")
 
+    fname_prefix = "%s-%07.2f-%05.2f-" % (init, theta, mu)
     dir = "output-mixed/" + fname_prefix.strip('-')
     try:
         os.mkdir(dir)
     except:
         pass
 
-    file = File(dir + "/" + fname_prefix + ".pvd")  # .vtu files will have the same prefix
+    file_name = dir + "/" + fname_prefix + ".pvd"
+    file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)
     w_ = Function(W)
@@ -75,7 +77,7 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
     _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'dz': [], 'constraint': [],
-             'symmetry': []}
+             'symmetry': [], 'file_name': file_name}
 
     Id = Identity(2)
     zero_energy = assemble((1. / 24) * inner(Id, Id) * dx(msh))
@@ -84,7 +86,7 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
         J = (theta / 2) * inner(eps(u) + outer(grad(v), grad(v)) / 2,
                                 eps(u) + outer(grad(v), grad(v)) / 2) * dx(msh) \
             + (1. / 24) * inner(grad(z) - Id, grad(z) - Id) * dx(msh) \
-            + (1. / 2) * mu * inner(z - grad(v), z - grad(v)) * dx
+            + (1. / 2) * mu * inner(z - grad(v), z - grad(v)) * dx(msh)
         return assemble(J)
 
     phi, psi, eta = TestFunctions(W)
@@ -198,7 +200,7 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     return _hist
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
 
     from joblib import Parallel, delayed
 
@@ -209,13 +211,12 @@ if __name__ == 'main':
 
     results_file = "results-mixed-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(39.0, 40.0, 1.0, dtype=float)
+    theta_values = np.arange(10, 12, 1.0, dtype=float)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', mesh_file, theta=theta, mu=1.0,
-                                                         fname_prefix='ani-parab-%07.2f-' % theta,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', mesh_file, theta=theta, mu=10.0,
                                                          max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-9, n=n)
                                       for n, theta in enumerate(theta_values))

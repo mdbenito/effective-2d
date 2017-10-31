@@ -1,9 +1,10 @@
 from dolfin import *
+import numpy as np
 import matplotlib.pyplot as pl
 import os
 import pickle as pk
 from plots import plots1
-
+import mshr
 
 def make_initial_data_mixed(which: str, degree=2) -> Expression:
     initial_data = {'zero': lambda x: [0.0, 0.0, 0.0, 0.0, 0.0],
@@ -187,3 +188,21 @@ def save_results(results: list, results_file: str):
 
     with open(results_file, "wb") as f:
         pk.dump(old_results, f)
+
+
+def generate_mesh(kind:str, m:int, n:int) -> str:
+    """ (Cached) Generates a mesh, saves it to a file and returns the file name
+     """
+    mesh_file = 'mesh-%dx%d-%s' % (m, n, kind)
+
+    if not os.path.isfile(mesh_file):
+        if kind.lower() == 'circle':
+            domain = mshr.Circle(Point(0.0, 0.0), 1, m)
+            msh = mshr.generate_mesh(domain, 18)
+        elif kind.lower == 'rectangle':
+            msh = RectangleMesh(Point(-1, -1), Point(1, 1), m, n)
+        else:
+            raise TypeError('Unhandled mesh type "%s"' % kind)
+        File(mesh_file) << msh
+
+    return mesh_file

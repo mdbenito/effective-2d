@@ -12,19 +12,21 @@ The model is characterised by the interplay of both membrane and bending
 energy, with a parameter $\theta$ interpolating it from the Kirchhoff to the
 linearised von Kármán regimes. We explore qualitative aspects of the
 minimisers as a function of $\theta$, in particular the breaking of symmetry
-at a critical value
+at a critical value.
 
-Gradient descent provides convergence to the expected minimisers, while an
-attempt at circumventing the use of Kirchhoff Discrete Triangles in the
-method of [2] does not. Some progress in the implementation of these elements
-for FEniCS is [here](https://bitbucket.org/mdbenito/hermite). Note however that
-this requires extensive changes and additions to FIAT and FFC, which are 
-available in my forks but are quite hacky and not thoroughly tested.
+Gradient descent provides convergence to the expected minimisers (proven to be
+global for small $\theta$ in [1])
+
+We try to circumvent the use of Kirchhoff Discrete Triangles in the method 
+of [2] without success. Some progress in the implementation of these
+elements for FEniCS is [here](https://bitbucket.org/mdbenito/hermite). Note
+however that this requires extensive changes and additions to FIAT and FFC, which
+are available in my forks but are quite hacky and not thoroughly tested.
 
 Results of the computations are stored both as VTK files in folders and as
 pickled objects containing relevant quantities gathered during the
 computations. It is ugly and should probably be replaced by some database like
-sqlite or some nosql thingy.
+sqlite or some document store / nosql thingy.
 
 ## Contents
 

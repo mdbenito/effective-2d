@@ -170,10 +170,10 @@ def name_run(r:dict) -> str:
 def save_results(results: list, results_file: str):
 
     # Load any previous results
-    if os.path.isfile(results_file):
+    try:
         with open(results_file, "rb") as fd:
             old_results = pk.load(fd)
-    else:
+    except:
         old_results = {}
 
     # Merge new results in and prepare plots for summary view (TODO)

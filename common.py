@@ -206,3 +206,16 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
         File(mesh_file) << msh
 
     return mesh_file
+
+def frobenius_form():
+    L2 = lambda F, G: F[i, j] * G[i, j]
+    Q2 = lambda F: L2(F, F)
+    return Q2, L2
+
+def isotropic_form(mu_lame=1, lambda_lame=1):
+    Q2 = lambda F: 2 * mu_lame * (sym(F)[i, j] * sym(F)[i, j]) + \
+                   (2 * mu_lame * lambda_lame) / (2 * mu_lame + lambda_lame) * tr(F) ** 2
+    _left = lambda F: 2 * mu_lame * sym(F) + \
+                      (2 * mu_lame * lambda_lame) / (2 * mu_lame + lambda_lame) * tr(F) * Identity(2)
+    L2 = lambda F, G: _left(F)[i, j] * G[i, j]
+    return Q2, L2

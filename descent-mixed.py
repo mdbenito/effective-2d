@@ -2,7 +2,7 @@ from dolfin import *
 import numpy as np
 import os
 from tqdm import tqdm
-from common import make_initial_data_mixed, circular_symmetry, save_results, generate_mesh
+from common import *
 from time import time
 
 # nbimporter has stopped working!
@@ -68,6 +68,8 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     w.interpolate(w_init)
     w_.interpolate(w_init)
 
+    Q2, L2 = frobenius_form()
+
     def eps(u):
         return (grad(u) + grad(u).T) / 2.0
 
@@ -79,13 +81,11 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'dz': [], 'constraint': [],
              'symmetry': [], 'file_name': file_name}
 
-    Id = Identity(2)
-    zero_energy = assemble((1. / 24) * inner(Id, Id) * dx(msh))
+    B = Identity(2)
 
     def energy(u, v, z, mu=mu):
-        J = (theta / 2) * inner(eps(u) + outer(grad(v), grad(v)) / 2,
-                                eps(u) + outer(grad(v), grad(v)) / 2) * dx(msh) \
-            + (1. / 24) * inner(grad(z) - Id, grad(z) - Id) * dx(msh) \
+        J = (theta / 2.) * Q2(eps(u) + outer(v, v) / 2) * dx(msh) \
+            + (1. / 24) * Q2(grad(z) - B) * dx(msh) \
             + (1. / 2) * mu * inner(z - grad(v), z - grad(v)) * dx(msh)
         return assemble(J)
 
@@ -125,10 +125,9 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
               % (step, cur_energy, _constraint, _symmetry))
 
         #### Gradient
-        dJ = theta * inner(eps(u_) + outer(grad(v_), grad(v_)) / 2, eps(phi)) * dx(msh) \
-             + theta * inner(eps(u_) + outer(grad(v_), grad(v_)) / 2,
-                             outer(grad(v_), grad(psi))) * dx(msh) \
-             + (1. / 12) * inner(grad(z_) - Id, grad(eta)) * dx(msh) \
+        # for some reason I'm not able to use derivative(J, w_, dtw)
+        dJ = theta * L2(eps(u_) + outer(v_, v_) / 2, eps(phi) + sym(outer(v_, psi))) * dx(msh) \
+             + (1. / 12) * L2(grad(v_) - B, grad(psi)) * dx(msh) \
              + mu * inner(grad(v_) - z_, grad(psi)) * dx(msh) \
              + mu * inner(z_ - grad(v_), eta) * dx(msh)
 
@@ -196,7 +195,7 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
         _hist['dtz'] = dz
     debug("Done after %d steps" % step)
 
-    # t.close()
+    #t.close()
     return _hist
 
 
@@ -211,7 +210,7 @@ if __name__ == '__main__':
 
     results_file = "results-mixed-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(10, 12, 1.0, dtype=float)
+    theta_values = np.arange(20, 24, 1.0, dtype=float)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))

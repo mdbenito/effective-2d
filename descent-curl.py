@@ -27,12 +27,12 @@ from dolfin import *
 import numpy as np
 import os
 from tqdm import tqdm
-from common import make_initial_data_penalty, circular_symmetry, compute_potential, save_results
+from common import *
 from time import time
 
-def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
-              e_stop_mult: float = 1e-6, max_steps: int = 1000,
-              save_funs: bool = False, n = 0):
+
+def run_model(init: str, mesh_file: str, theta: float, mu: float = 0.0,
+              e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True, n=0):
     """
     """
 
@@ -93,38 +93,41 @@ def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
     w.interpolate(w_init)
     w_.interpolate(w_init)
 
+    # Q2, L2 = frobenius_form()
+
+    # Some material or other...
+    E = 1e9
+    nu = 0.3
+    Q2, L2 = isotropic_form(e * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 + 2 * nu))
+
     def eps(u):
         return (grad(u) + grad(u).T) / 2.0
 
     e_stop = msh.hmin() * e_stop_mult
     max_line_search_steps = 20
     step = 0
-    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
+    omega = 0.25  # Gradient descent fudge factor \in (0, 1/2)
     _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
-             'J': [], 'alpha': [], 'du': [], 'dv': [], 'curl': [],
+             'J': [], 'alpha': [], 'du': [], 'dv': [], 'constraint': [],
              'symmetry': [], 'file_name': file_name}
 
-    Id = Identity(2)
-    zero_energy = assemble((1. / 24) * inner(Id, Id) * dx(msh))
+    B = Identity(2)
 
     def energy(u, v, mu=mu):
-        J = (theta / 2) * inner(eps(u) + outer(v, v) / 2, eps(u) + outer(v, v) / 2) * dx(msh) + (1. / 24) * inner(
-            grad(v) - Id, grad(v) - Id) * dx(msh) + mu * inner(curl(v), curl(v)) * dx(msh)
+        J = (theta / 2.) * Q2(eps(u) + outer(v, v) / 2) * dx(msh) \
+            + (1. / 24) * Q2(grad(v) - B) * dx(msh) \
+            + mu * inner(curl(v), curl(v)) * dx(msh)
         return assemble(J)
 
-    phi, psi = TestFunctions(W)
     # CAREFUL!! Picking the right scalar product here is essential
     # Recall the issues with boundary values: integrate partially and only boundary terms survive...
-    # dtu, dtv = TrialFunctions(W)
-    # L = inner(dtu, phi)*dx + inner(dtv, psi)*dx \
-    #    + inner(grad(dtu), grad(phi))*dx + inner(grad(dtv), grad(psi))*dx
-    # The previous lines are equivalent to:
     dtw = TrialFunction(W)
     z = TestFunction(W)
     L = inner(dtw, z) * dx + inner(grad(dtw), grad(z)) * dx
 
     dw = Function(W)
     du, dv = dw.split()
+    phi, psi = TestFunctions(W)
 
     # Output initial condition
     opd = compute_potential(v, V)
@@ -142,15 +145,15 @@ def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
     while alpha * (ndu ** 2 + ndv ** 2) > e_stop and step < max_steps:
         _curl = assemble(curl(v_) * dx)
         _symmetry = circular_symmetry(disp)
-        _hist['curl'].append(_curl)
+        _hist['constraint'].append(_curl)
         _hist['symmetry'].append(_symmetry)
         debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
               % (step, cur_energy, _curl, _symmetry))
 
         #### Gradient
-        dJ = theta * inner(eps(u_) + outer(v_, v_) / 2, eps(phi)) * dx(msh) \
-             + theta * inner(eps(u_) + outer(v_, v_) / 2, outer(v_, psi)) * dx(msh) \
-             + (1. / 12) * inner(grad(v_) - Id, grad(psi)) * dx(msh) \
+        # for some reason I'm not able to use derivative(J, w_, dtw)
+        dJ = theta * L2(eps(u_) + outer(v_, v_) / 2, eps(phi) + sym(outer(v_, psi))) * dx(msh) \
+             + (1. / 12) * L2(grad(v_) - B, grad(psi)) * dx(msh) \
              + 2 * mu * inner(curl(v_), curl(psi)) * dx(msh)
 
         debug("\tSolving...", end='')
@@ -165,6 +168,7 @@ def run_model(init: str, mesh_file:str, theta: float, mu: float = 1.0,
         debug(" done with |du| = %.3f, |dv| = %.3f" % (ndu, ndv))
 
         #### Line search
+        new_energy = 0
         debug("\tSearching... ", end='')
         while True:
             w = project(w_ + alpha * dw, W)
@@ -228,12 +232,12 @@ if __name__ == "__main__":
 
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(8.7, 8.8, 0.1, dtype=float)
+    theta_values = np.arange(5, 35, 5.0, dtype=float)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', theta=theta, mu=0.0,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', mesh_file, theta=theta, mu=0.0,
                                                          max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))

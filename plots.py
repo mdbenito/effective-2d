@@ -116,8 +116,8 @@ def plots4(runs:list, _slice=slice(0,-1), running_mean_window=1):
     pl.legend()
     pl.subplot(3,2,4)
     for h in _runs:
-        pl.plot(h['curl'][_slice], label='$\\theta = %.2f$' % h['theta'])
-    pl.title("curl")
+        pl.plot(h['constraint'][_slice], label='$\\theta = %.2f$' % h['theta'])
+    pl.title("constraint")
     pl.legend()
     pl.subplot(3,2,5)
     xmax = 0

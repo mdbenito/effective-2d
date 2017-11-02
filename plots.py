@@ -3,6 +3,8 @@ from dolfin import plot, norm
 import numpy as np
 import matplotlib.pyplot as pl
 
+__all__ = ["plots1", "plots2", "plots3", "plots4"]
+
 
 def running(x, N=5):
     return np.convolve(x, np.ones((N,))/N, mode='valid')

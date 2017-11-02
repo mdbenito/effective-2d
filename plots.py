@@ -95,31 +95,34 @@ def plots3(run: dict, begin: float = 0.0, end: float = np.inf):
     pl.ylabel("J")
 
 
-def plots4(runs:list, _slice=slice(0,-1), running_mean_window=1):
-    _runs = sorted(runs, key=lambda x: x['theta'])
-    pl.figure(figsize=(18,12), )
+def plots4(runs, _slice=slice(0, -1), running_mean_window=1):
+    if isinstance(runs, filter):
+        _runs = [v for k, v in sorted(runs, key=lambda x: x[1]['theta'])]
+    elif isinstance(runs, dict):
+        _runs = [v for k, v in sorted(runs.items(), key=lambda x: x[1]['theta'])]
+    pl.figure(figsize=(18, 12), )
     pl.suptitle("'%s'" % _runs[0]['init'])
-    pl.subplot(3,2,1)
+    pl.subplot(3, 2, 1)
     for h in _runs:
         pl.plot(running(h['du'][_slice], running_mean_window), label='$\\theta = %.2f$' % h['theta'])
     pl.title('$d_{t}u$, window: %d' % running_mean_window)
     pl.legend()
-    pl.subplot(3,2,2)
+    pl.subplot(3, 2, 2)
     for h in _runs:
         pl.plot(running(h['dv'][_slice], running_mean_window), label='$\\theta = %.2f$' % h['theta'])
     pl.title('$d_{t}v$, window: %d' % running_mean_window)
     pl.legend()
-    pl.subplot(3,2,3)
+    pl.subplot(3, 2, 3)
     for h in _runs:
         pl.plot(running(np.log(h['alpha'][_slice]), running_mean_window), label='$\\theta = %.2f$' % h['theta'])
     pl.title('$log\ \\alpha_t$, window: %d' % running_mean_window)
     pl.legend()
-    pl.subplot(3,2,4)
+    pl.subplot(3, 2, 4)
     for h in _runs:
         pl.plot(h['constraint'][_slice], label='$\\theta = %.2f$' % h['theta'])
     pl.title("constraint")
     pl.legend()
-    pl.subplot(3,2,5)
+    pl.subplot(3, 2, 5)
     xmax = 0
     for h in _runs:
         xmax = max(xmax, len(h['symmetry'][_slice]))
@@ -127,7 +130,7 @@ def plots4(runs:list, _slice=slice(0,-1), running_mean_window=1):
     pl.hlines(_runs[0]['symmetry'][0], xmin=0, xmax=xmax, linestyles='dotted')
     pl.title("symmetry")
     pl.legend()
-    pl.subplot(3,2,6)
+    pl.subplot(3, 2, 6)
     for h in _runs:
         pl.plot(h['J'][_slice], label='$\\theta = %.2f$' % h['theta'])
     pl.title("Energy")

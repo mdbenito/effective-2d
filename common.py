@@ -184,12 +184,6 @@ def save_results(results: list, results_file: str):
 
     # Merge new results in and prepare plots for summary view (TODO)
     new_results = {name_run(r): r for r in results}
-    for k, r in new_results.items():
-        r['plots1_fname'] = "output/plots1-" + k + ".eps"
-        plots1(r)
-        pl.savefig(r['plots1_fname'])
-        pl.close()
-
     old_results.update(new_results)
 
     with open(results_file, "wb") as f:

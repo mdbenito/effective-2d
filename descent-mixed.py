@@ -19,7 +19,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
 
     msh = Mesh(mesh_file)
 
-    t = tqdm(total=max_steps, desc='th=%7.2f' % theta, position=n, dynamic_ncols=True)
+    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
     def noop(*args, **kwargs):
         pass

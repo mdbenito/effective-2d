@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Results</title>
+    <meta charset="utf-8"></meta>
+    <link href="/css/footable.standalone.min.css" rel="stylesheet"></link>
+    <link href="/css/font-awesome.min.css" rel="stylesheet"></link>
+    <link href="/css/main.css" rel="stylesheet"></link>
+  </head>
+  <body>
+  <ul class="footable btn-list">
+    <li class="btn-list-item">
+      <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button></li>
+    <li class="btn-list-item">
+      <button class="btn btn-primary" type="button" id="reload">Reload</button></li>
+  </ul>
+
+  <!-- lightbox container hidden with CSS -->
+  <a href="#_" class="lightbox" id="multiple_plot_target">
+    <img id="multiple_plot" src="">
+  </a>
+
+    <table class="table" id="results"
+           data-sorting="true" data-filtering="true" data-show-toggle="false"
+           data-paging="true" data-paging-size="100"></table>
+    <script src="/js/jquery-3.2.1.min.js"></script>
+    <script src="/js/footable.min.js"></script>
+    <script type="text/javascript">
+    jQuery(function($) {
+      $('#results').footable({
+        "columns": $.get('/api/columns'),
+        "rows": $.get('/api/rows')
+      });
+    });
+    $('#plot_multiple').on('click', function(e) {
+      var active = $('.tgl:checked').map(function () { return this.id; }).get();
+	  $.post("/api/plot_multiple/", active.join(),
+	   function(data) {
+	     $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
+	     var url = location.href
+	     location.href = "#multiple_plot_target";
+	     history.replaceState(null,null,url);
+	     });
+    });
+    </script>
+  </body>
+</html>

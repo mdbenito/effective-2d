@@ -6,5 +6,4 @@
 *.pickle
 __pycache__/
 output*/
-report/index.html
 \.idea/

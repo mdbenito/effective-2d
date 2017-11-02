@@ -3,11 +3,7 @@
 *.pvd
 *.vtu
 *.h5
-
 *.pickle
-
 __pycache__/
-
-output/
-
+output*/
 \.idea/

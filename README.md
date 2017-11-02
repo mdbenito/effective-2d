@@ -43,6 +43,9 @@ sqlite or some document store / nosql thingy.
 * `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
 * `von Karman mixed.ipynb`: Implementation of the model in [2] using a
   mixed model formulation. (Not working)
+* `report.py`: A minimal web server to explore results in tabular form and
+  easily combine them into plots. Not *very* useful, but it was fun and quick
+  to do.
 
 ## Dependencies
 
@@ -50,6 +53,18 @@ sqlite or some document store / nosql thingy.
  contains all of it plus a few extra goodies.
 * [tqdm](https://github.com/tqdm/tqdm) for the silly progress bars.
  I really shouldn't have made that necessary.
+
+## To do
+
+* Fix the issues with nbimporter and leave the models in the notebooks,
+  instead of having copies (yuk!) in python scripts for parallel runs.
+* Store results in a sensible database and update it while simulations are
+  still running.
+* Be more systematic with "unique" identifiers for runs (crappy and fragile now).
+* Make the reports more flexible. Possibly ditch that webserver nonsense
+  altogether and implement some cool iPython widgets (or even just use something
+  like [qgrid](https://github.com/quantopian/qgrid)).
+
 
 ## License
 

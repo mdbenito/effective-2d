@@ -42,6 +42,8 @@
 	     history.replaceState(null,null,url);
 	     });
     });
+    $('#reload').on('click', function(e) { $.get("/api/reload"); });
+
     </script>
   </body>
 </html>

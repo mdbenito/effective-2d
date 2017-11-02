@@ -8,17 +8,21 @@
     <link href="/css/main.css" rel="stylesheet"></link>
   </head>
   <body>
-  <ul class="footable btn-list">
-    <li class="btn-list-item">
-      <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button></li>
-    <li class="btn-list-item">
-      <button class="btn btn-primary" type="button" id="reload">Reload</button></li>
-  </ul>
+    <ul class="footable btn-list">
+      <li class="btn-list-item">
+        <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button></li>
+      <li class="btn-list-item">
+        <button class="btn btn-primary" type="button" id="reload">Reload</button></li>
+    </ul>
 
-  <!-- lightbox container hidden with CSS -->
-  <a href="#_" class="lightbox" id="multiple_plot_target">
-    <img id="multiple_plot" src="">
-  </a>
+    <!-- lightbox container hidden with CSS -->
+    <a href="#_" class="lightbox" id="multiple_plot_target">
+      <img id="multiple_plot" src="">
+    </a>
+
+    <a href="#_" class="lightbox" id="single_plot_target">
+      <img id="single_plot" src="">
+    </a>
 
     <table class="table" id="results"
            data-sorting="true" data-filtering="true" data-show-toggle="false"
@@ -34,16 +38,22 @@
     });
     $('#plot_multiple').on('click', function(e) {
       var active = $('.tgl:checked').map(function () { return this.id; }).get();
-	  $.post("/api/plot_multiple/", active.join(),
-	   function(data) {
-	     $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
-	     var url = location.href
-	     location.href = "#multiple_plot_target";
-	     history.replaceState(null,null,url);
-	     });
+      $.post("/api/plot_multiple/", active.join(),
+       function(data) {
+         $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
+         var url = location.href
+         location.href = "#multiple_plot_target";
+         history.replaceState(null,null,url);
+         });
     });
-    $('#reload').on('click', function(e) { $.get("/api/reload"); });
-
+    $('#reload').on('click', function(e) {
+       $.get("/api/reload");
+       $('#results').footable({
+         "columns": $.get('/api/columns'),
+         "rows": $.get('/api/rows')
+       });
+     });
+    function show_one(e) { $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value')); }
     </script>
   </body>
 </html>

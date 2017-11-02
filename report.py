@@ -73,7 +73,7 @@ class PickleData(Data):
             row_data['time'] = "%02d:%02d:%02d" % (hh, mm, ss)
             row_data['form_name'] = row.get('Q2').get('form_name')
             row_data['e_stop'] = int(log10(row['e_stop'])) - 1
-            row_data['plot'] = '<a href="/api/plot_one/%s">Plot</a>' % key
+            row_data['plot'] = '<a class="plot_one" href="#single_plot_target" data-value="%s" onclick="show_one(this)">Plot</a>' % key
             row_data['results'] = ''
             row_data['form_arguments'] = ", ".join("%s: %f" % (k, v) for k, v in
                                                     row.get('Q2').get('arguments').items())

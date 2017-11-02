@@ -50,7 +50,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    fname_prefix = "%s-%s-%07.2f-%05.2f-" % (init, qform, theta, mu)
+    fname_prefix = "%s-%s-%08.3f-%05.2f-" % (init, qform, theta, mu)
     dir = "output-mixed/" + fname_prefix.strip('-')
     try:
         os.mkdir(dir)

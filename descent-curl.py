@@ -40,7 +40,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     msh = Mesh(mesh_file)
 
-    t = tqdm(total=max_steps, desc='th=% 7.2f' % theta, position=n, dynamic_ncols=True)
+    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
     def noop(*args, **kwargs):
         pass
@@ -70,7 +70,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    fname_prefix = "%s-%s-%07.2f-%05.2f-" % (init, qform, theta, mu)
+    fname_prefix = "%s-%s-%08.3f-%05.2f-" % (init, qform, theta, mu)
     dir = "output-curl/" + fname_prefix.strip('-')
     try:
         os.mkdir(dir)
@@ -231,16 +231,16 @@ if __name__ == "__main__":
 
     set_log_level(ERROR)
 
-    results_file = "results-combined.pickle"
+    results_file = "results-curl-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(6, 10, 1.0, dtype=float)
+    theta_values = np.arange(8.681, 8.690, 0.002)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isotropic', mesh_file,
-                                                         theta=theta, mu=10.0,
-                                                         max_steps=20000, save_funs=False,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
+                                                         theta=theta, mu=0.0,
+                                                         max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))
 

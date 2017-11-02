@@ -178,7 +178,7 @@ def name_run(r:dict) -> str:
     """ Returns a 'unique' string identifier for the given run.
     Should be enough :/
     """
-    return "%s_%07.2f_%3.1f_%.2e_%d" % (r['init'], r['theta'], r['mu'], r['e_stop'], r['steps'])
+    return "%s_%08.3f_%3.1f_%.2e_%d" % (r['init'], r['theta'], r['mu'], r['e_stop'], r['steps'])
 
 
 def save_results(results: list, results_file: str):

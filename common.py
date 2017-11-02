@@ -8,7 +8,8 @@ import mshr
 
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
-           "compute_potential", "save_results", "generate_mesh", "frobenius_form", "isotropic_form"]
+           "compute_potential", "save_results", "generate_mesh", "frobenius_form", "isotropic_form",
+           "filter_results"]
 
 
 def make_initial_data_mixed(which: str, degree=2) -> Expression:
@@ -236,3 +237,24 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
         return _left(F)[i, j] * G[i, j]
 
     return isotropic, L2
+
+
+def filter_results(res: dict, init: str = None, qform: str = None, mesh_file: str = None,
+                theta: tuple = None, mu: tuple = None, e_stop: tuple = None, steps: tuple = None):
+    """ example:
+        get_results(res, theta=(20,25), init='ani_parab', mu=(0,11.0))
+    Tuples denote ranges
+    """
+
+    def which(x: tuple):
+        k, v = x
+        cond = init in (None, v['init']) \
+               and qform in (None, v['Q2']['form_name']) \
+               and (theta is None or theta[0] <= v['theta'] < theta[1]) \
+               and (mu is None or mu[0] <= v['mu'] < mu[1]) \
+               and (e_stop is None or e_stop[0] <= v['e_stop'] < e_stop[1])
+        # and mesh_file in (None, r['mesh_file'])
+        return cond
+
+    filtered = filter(which, res.items())
+    return filtered

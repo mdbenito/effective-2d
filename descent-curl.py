@@ -70,7 +70,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    fname_prefix = "%s-%07.2f-%05.2f-" % (init, qform, theta, mu)
+    fname_prefix = "%s-%s-%07.2f-%05.2f-" % (init, qform, theta, mu)
     dir = "output-curl/" + fname_prefix.strip('-')
     try:
         os.mkdir(dir)
@@ -221,6 +221,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     t.close()
     return _hist
 
+
 if __name__ == "__main__":
 
     from joblib import Parallel, delayed
@@ -237,7 +238,8 @@ if __name__ == "__main__":
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', mesh_file, theta=theta, mu=0.0,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isometric', mesh_file,
+                                                         theta=theta, mu=0.0,
                                                          max_steps=20000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))

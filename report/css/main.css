@@ -17,6 +17,9 @@ html, body {
   font-family: sans-serif;
 }
 
+thead {
+  background-color: #e2eaf1;
+}
 
 ul, li {
   list-style: none;
@@ -28,7 +31,8 @@ ul, li {
   text-align: center;
   display: -webkit-box;
   display: -ms-flexbox;
-  display: flex;
+  display: none;  /* enabled after footable renders */
+  /* display: inline-flex; */
   -webkit-box-align: center;
       -ms-flex-align: center;
           align-items: center;

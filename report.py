@@ -12,7 +12,6 @@ import pickle as pk
 from math import floor, log10
 import binascii
 
-
 class Data(object):
     def __init__(self):
         pass
@@ -41,6 +40,16 @@ class PickleData(Data):
     def __getitem__(self, item):
         return self._results.get(item)
 
+    def delete(self, item):
+        # TODO: save modified results to disk...
+        try:
+            # from sys import stderr
+            # stderr.write("Would delete: " + item)
+            del self._results[item]
+            return item
+        except KeyError:
+            return None
+
     def columns(self):
         cols = [{'name': 'form_name', 'title': 'Q2'},
                 {'name': 'init', 'title': 'Initial data'},
@@ -49,10 +58,10 @@ class PickleData(Data):
                 {'name': 'e_stop', 'title': 'eps order', 'type': 'number'},
                 {'name': 'steps', 'title': 'Steps', 'type': 'number'},
                 {'name': 'time', 'title': 'Duration', 'type': 'time'},
-                {'name': 'plot', 'title': 'plot', 'type': 'html'},
+                {'name': 'plot', 'title': '', 'type': 'html'},
                 {'name': 'results', 'type': 'html', 'breakpoints': 'all', 'title': 'results file:'},
                 {'name': 'form_arguments', 'breakpoints': 'all', 'title': 'form arguments:'},
-                {'name': 'select', 'title': 'Select'}]
+                {'name': 'select', 'title': ''}]
         return json.dumps(cols)
 
     def rows(self):
@@ -64,7 +73,7 @@ class PickleData(Data):
         ret = []
         for key, row in self._results.items():
             row_data = {col: val for col, val in row.items() if col in ('init', 'steps')}
-            row_data['theta'] = round(row['theta'], 2)
+            row_data['theta'] = round(row['theta'], 3)
             row_data['mu'] = round(row['mu'], 2)
             tt = max(0, row.get('time', 0))
             hh = floor(tt / 3600)
@@ -168,23 +177,8 @@ class Handler(BaseHTTPRequestHandler):
                         self._set_headers(400, 'Error: %s' % str(e))
             else:
                 self.send_error(400, 'Bad Request: run "%s" does not exist' % key)
-        else:
-            # self.log_error("Unknown API call: '%s'" % self.path)
-            self.send_error(403, "Unknown API call: '%s'" % self.path)
-
-    def do_HEAD(self):
-        self._set_headers()
-
-    def do_POST(self):
-        if re.match('/api/plot_multiple/', self.path) is not None:
-            length = int(self.headers.get('content-length'))
-            charset = re.match(".*charset=([^ ]+).*", self.headers.get('content-type'))
-            if charset:
-                charset = charset.group(1).lower()
-            else:
-                charset = 'utf-8'
-            post_data = self.rfile.read(length)
-            ids = post_data.decode(charset).split(',')
+        elif re.match('/api/plot_multiple/', self.path) is not None:
+            ids = self.path.split('/')[-1].split(',')
             steps = min([data[id]['steps'] for id in ids])
             if steps < 200:
                 beg, win = 10, 1
@@ -203,9 +197,24 @@ class Handler(BaseHTTPRequestHandler):
                     shutil.copyfileobj(io.BytesIO(b64), self.wfile)
                 except Exception as e:
                     self.send_error(400, "Error: %s" % str(e))
+        elif re.match('/api/delete/', self.path) is not None:
+            ids = self.path.split('/')[-1].split(',')
+            deleted = []
+            for id in ids:
+                deleted.append(data.delete(id))
+            self._set_headers(200)
+            json.dumps(deleted)
         else:
-            self.log_error("Unknown API call: '%s'" % self.path)
+            # self.log_error("Unknown API call: '%s'" % self.path)
             self.send_error(403, "Unknown API call: '%s'" % self.path)
+
+    def do_HEAD(self):
+        self._set_headers()
+
+    def do_POST(self):
+        #self.log_error("Unhandled POST API call: '%s'" % self.path)
+        self.send_error(403, "Unhandled POST API call: '%s'" % self.path)
+
 
 def run(server_class=HTTPServer, handler_class=Handler, port=8080):
     server_address = ('localhost', port)

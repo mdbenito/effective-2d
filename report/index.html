@@ -6,9 +6,13 @@
     <link href="/css/footable.standalone.min.css" rel="stylesheet"></link>
     <link href="/css/font-awesome.min.css" rel="stylesheet"></link>
     <link href="/css/main.css" rel="stylesheet"></link>
+    <link href="/css/jquery.alertable.css" rel="stylesheet"></link>
   </head>
   <body>
-    <ul class="footable btn-list">
+    <ul class="btn-list" id="control-btns">
+      <li class="btn-list-item" style="margin-right: 10em;">
+        <button class="btn btn-primary" type="button" id="delete">Delete selected</button>
+      </li>
       <li class="btn-list-item">
         <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button></li>
       <li class="btn-list-item">
@@ -28,31 +32,51 @@
            data-sorting="true" data-filtering="true" data-show-toggle="false"
            data-paging="true" data-paging-size="100"></table>
     <script src="/js/jquery-3.2.1.min.js"></script>
+    <script src="/js/jquery.floatThead.min.js"></script>
     <script src="/js/footable.min.js"></script>
+    <script src="/js/jquery.alertable.min.js"></script>
     <script type="text/javascript">
     jQuery(function($) {
       $('#results').footable({
         "columns": $.get('/api/columns'),
-        "rows": $.get('/api/rows')
-      });
+        "rows": $.get('/api/rows'),
+        "on": { "postdraw.ft.table": function (e, ft) {
+            /*HACK! I need to delay moving the element or it will just disappear*/
+            $(e.currentTarget.tHead).delay(100).queue(function () {
+              $('tr.footable-filtering > th > .form-inline').prepend($('#control-btns'));
+              $('#results').floatThead();
+              $('#control-btns').css('display', 'inline-flex');});
+            }
+         }
+       });
     });
+
+    $('#delete').on('click', function() {
+    var active = $('.tgl:checked').map(function () { return this.id; }).get();
+    $.alertable.confirm('Delete: ' + active.join()).then(function() {
+       $.get("/api/delete/" + active.join(), function(data) {
+       console.log("Reloading.");
+       $('#results').footable({ "columns": $.get('/api/columns'), "rows": $.get('/api/rows')});
+        /*console.log("Deleted: " + data);*/ });
+    }, function() {
+      console.log('Deletion canceled');
+    });
+  });
+
     $('#plot_multiple').on('click', function(e) {
       var active = $('.tgl:checked').map(function () { return this.id; }).get();
-      $.post("/api/plot_multiple/", active.join(),
-       function(data) {
-         $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
-         var url = location.href
-         location.href = "#multiple_plot_target";
-         history.replaceState(null,null,url);
-         });
+      $.get("/api/plot_multiple/" + active.join(), function(data) {
+        $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
+        var url = location.href
+        location.href = "#multiple_plot_target";
+        history.replaceState(null,null,url);
+      });
     });
     $('#reload').on('click', function(e) {
-       $.get("/api/reload");
-       $('#results').footable({
-         "columns": $.get('/api/columns'),
-         "rows": $.get('/api/rows')
+       $.get("/api/reload", function(data) {
+          $('#results').footable({ "columns": $.get('/api/columns'), "rows": $.get('/api/rows')});
        });
-     });
+    });
     function show_one(e) { $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value')); }
     </script>
   </body>

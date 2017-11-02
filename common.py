@@ -6,6 +6,11 @@ import pickle as pk
 from plots import plots1
 import mshr
 
+
+__all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
+           "compute_potential", "save_results", "generate_mesh", "frobenius_form", "isotropic_form"]
+
+
 def make_initial_data_mixed(which: str, degree=2) -> Expression:
     initial_data = {'zero': lambda x: [0.0, 0.0, 0.0, 0.0, 0.0],
                     'parab': lambda x: [0.0, 0.0, 0.5*x[0]**2 + 0.5*x[1]**2, x[0], x[1]],
@@ -207,15 +212,27 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
 
     return mesh_file
 
-def frobenius_form():
-    L2 = lambda F, G: F[i, j] * G[i, j]
-    Q2 = lambda F: L2(F, F)
-    return Q2, L2
 
-def isotropic_form(mu_lame=1, lambda_lame=1):
-    Q2 = lambda F: 2 * mu_lame * (sym(F)[i, j] * sym(F)[i, j]) + \
-                   (2 * mu_lame * lambda_lame) / (2 * mu_lame + lambda_lame) * tr(F) ** 2
-    _left = lambda F: 2 * mu_lame * sym(F) + \
-                      (2 * mu_lame * lambda_lame) / (2 * mu_lame + lambda_lame) * tr(F) * Identity(2)
-    L2 = lambda F, G: _left(F)[i, j] * G[i, j]
-    return Q2, L2
+def frobenius_form():
+    def L2(F, G):
+            return F[i, j] * G[i, j]
+
+    def frobenius(F):
+        return L2(F, F)
+    frobenius.arguments = {}
+
+    return frobenius, L2
+
+
+def isotropic_form(lambda_lame=1, mu_lame=1):
+    def isotropic(F):
+        return 2 * mu_lame * (sym(F)[i, j] * sym(F)[i, j]) + \
+               (2 * mu_lame * lambda_lame) / (2 * mu_lame + lambda_lame) * tr(F) ** 2
+    isotropic.arguments = {'lambda': lambda_lame, 'mu': mu_lame}
+
+    def L2(F, G):
+        _left = lambda F: 2 * mu_lame * sym(F) + \
+                         (2 * mu_lame * lambda_lame) / (2 * mu_lame + lambda_lame) * tr(F) * Identity(2)
+        return _left(F)[i, j] * G[i, j]
+
+    return isotropic, L2

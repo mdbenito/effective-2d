@@ -225,7 +225,7 @@ if __name__ == '__main__':
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isometric', mesh_file,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isotropic', mesh_file,
                                                          theta=theta, mu=10.0,
                                                          max_steps=20000, save_funs=False,
                                                          e_stop_mult=1e-9, n=n)

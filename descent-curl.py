@@ -233,13 +233,13 @@ if __name__ == "__main__":
 
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(8, 10, 1.0, dtype=float)
+    theta_values = np.arange(6, 10, 1.0, dtype=float)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isometric', mesh_file,
-                                                         theta=theta, mu=0.0,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isotropic', mesh_file,
+                                                         theta=theta, mu=10.0,
                                                          max_steps=20000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))

@@ -11,10 +11,12 @@ from time import time
 #from descent_mixed import run_model as mixed_model
 
 
-def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
-              e_stop_mult: float = 1e-6, max_steps: int = 1000, save_funs: bool = False, n = 0):
+def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1.0,
+              e_stop_mult: float = 1e-7, max_steps: int = 1000, save_funs: bool = True, n=0):
     """
     """
+
+    qform = qform.lower()
 
     msh = Mesh(mesh_file)
 
@@ -49,7 +51,7 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    fname_prefix = "%s-%07.2f-%05.2f-" % (init, theta, mu)
+    fname_prefix = "%s-%s-%07.2f-%05.2f-" % (init, qform, theta, mu)
     dir = "output-mixed/" + fname_prefix.strip('-')
     try:
         os.mkdir(dir)
@@ -68,7 +70,14 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     w.interpolate(w_init)
     w_.interpolate(w_init)
 
-    Q2, L2 = frobenius_form()
+    if qform == 'frobenius':
+        Q2, L2 = frobenius_form()
+    elif qform == 'isotropic':
+        # Isotropic density for some material or other...
+        E, nu = 1e9, 0.3
+        Q2, L2 = isotropic_form(E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 + 2 * nu))
+    else:
+        raise Exception("Unknown quadratic form name '%s'" % qform)
 
     def eps(u):
         return (grad(u) + grad(u).T) / 2.0
@@ -79,21 +88,23 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
     _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'dz': [], 'constraint': [],
+             'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
              'symmetry': [], 'file_name': file_name}
 
     B = Identity(2)
+    zero_energy = assemble((1. / 24) * inner(B, B) * dx(msh))
 
     def energy(u, v, z, mu=mu):
-        J = (theta / 2.) * Q2(eps(u) + outer(v, v) / 2) * dx(msh) \
-            + (1. / 24) * Q2(grad(z) - B) * dx(msh) \
+        J = (theta / 2) * Q2(eps(u) + outer(grad(v), grad(v)) / 2) * dx(msh) \
+            + (1. / 24) * Q2(grad(z) - Id) * dx(msh) \
             + (1. / 2) * mu * inner(z - grad(v), z - grad(v)) * dx(msh)
         return assemble(J)
 
-    phi, psi, eta = TestFunctions(W)
     # CAREFUL!! Picking the right scalar product here is essential
     # Recall the issues with boundary values: integrate partially
     # and only boundary terms survive...
     dtu, dtv, dtz = TrialFunctions(W)
+    phi, psi, eta = TestFunctions(W)
     L = inner(dtu, phi) * dx + inner(grad(dtu), grad(phi)) * dx \
         + inner(dtv, psi) * dx + inner(grad(dtv), grad(psi)) * dx \
         + inner(dtz, eta) * dx + inner(grad(dtz), grad(eta)) * dx
@@ -105,7 +116,6 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
     fax.assign(disp.sub(0), u.sub(0))
     fay.assign(disp.sub(1), u.sub(1))
     faz.assign(disp.sub(2), v)
-
     file << (disp, float(step))
 
     cur_energy = energy(u, v, z)
@@ -126,10 +136,10 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
 
         #### Gradient
         # for some reason I'm not able to use derivative(J, w_, dtw)
-        dJ = theta * L2(eps(u_) + outer(v_, v_) / 2, eps(phi) + sym(outer(v_, psi))) * dx(msh) \
-             + (1. / 12) * L2(grad(v_) - B, grad(psi)) * dx(msh) \
-             + mu * inner(grad(v_) - z_, grad(psi)) * dx(msh) \
-             + mu * inner(z_ - grad(v_), eta) * dx(msh)
+        dJ = theta * L2(eps(u_) + outer(grad(v_), grad(v_)) / 2,
+                        eps(phi) + sym(outer(grad(v_), grad(psi)))) * dx(msh) \
+             + (1. / 12) * L2(grad(z_) - Id, grad(eta)) * dx(msh) \
+             + mu * inner(grad(v_) - z_, grad(psi) - eta) * dx(msh)
 
         debug("\tSolving...", end='')
         solve(L == -dJ, dw, [])
@@ -195,7 +205,7 @@ def run_model(init: str, mesh_file: str, theta: float, mu: float = 1.0,
         _hist['dtz'] = dz
     debug("Done after %d steps" % step)
 
-    #t.close()
+    t.close()
     return _hist
 
 
@@ -215,8 +225,9 @@ if __name__ == '__main__':
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', mesh_file, theta=theta, mu=10.0,
-                                                         max_steps=10000, save_funs=False,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isometric', mesh_file,
+                                                         theta=theta, mu=10.0,
+                                                         max_steps=20000, save_funs=False,
                                                          e_stop_mult=1e-9, n=n)
                                       for n, theta in enumerate(theta_values))
 

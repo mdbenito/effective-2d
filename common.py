@@ -1,9 +1,7 @@
 from dolfin import *
 import numpy as np
-import matplotlib.pyplot as pl
 import os
 import pickle as pk
-from plots import plots1
 import mshr
 
 
@@ -19,8 +17,8 @@ def make_initial_data_mixed(which: str, degree=2) -> Expression:
 
     class InitialDisplacements(Expression):
         """ The first two components of this expression correspond
-        to in-plane-displacements, the last two to the *gradient* of
-        out-of-plane displacements.
+        to in-plane-displacements, the third to out-of-plane displacements
+        and the last two to the *gradient* of out-of-plane displacements.
         """
         def eval(self, values, x):
             vals = initial_data[which](x)
@@ -32,6 +30,7 @@ def make_initial_data_mixed(which: str, degree=2) -> Expression:
 
         def value_shape(self):
             return (5,)
+
     return InitialDisplacements(degree=degree)
 
 
@@ -67,7 +66,11 @@ def make_initial_data_penalty(which: str, degree=2) -> Expression:
 
 def circular_symmetry(disp: Function) -> float:
     """ Computes the quotient of the lenghts of the principal axes of an ellipse
-    This assumes that the domain before the deformation is a circle."""
+    This assumes that the domain before the deformation is a circle.
+
+    FIXME: I should be taking more points. Also, it would be best to compute
+    the intersection of rays with the mesh, instead of this hackish min/max stuff.
+    """
     if circular_symmetry.pts is None:
         cc = disp.function_space().mesh().coordinates()
         xmin = cc[:,0].argmin()
@@ -157,7 +160,12 @@ def test_potential(fun_exp: str, grad_exp: (str, str), eps: float = 1e-4) -> boo
     p = project(p + Constant(hack), V)
     test1 = project(u - p, V)
     test2 = project(z - grad(p), Z)
-    print("OK." if norm(test1) < eps and norm(test2) < eps else "FAILED.")
+    if norm(test1) < eps and norm(test2) < eps:
+        print("OK.")
+        return True
+    else:
+        print("FAILED.")
+        return False
 
 # test_potential("x[0]*x[0] + x[1]*x[1]", ("2*x[0]", "2*x[1]"))
 # test_potential("x[0]/x[1] + x[0]*x[1]", ("1/x[1]+x[1]", "-x[0]/(x[1]*x[1])+x[0]"))
@@ -174,7 +182,8 @@ def name_run(r:dict) -> str:
 
 
 def save_results(results: list, results_file: str):
-
+    """ Takes a list of results dicts and pickles it.
+    Useful mainly for the output of Parallel jobs."""
     # Load any previous results
     try:
         with open(results_file, "rb") as fd:
@@ -234,7 +243,7 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
 
 
 def filter_results(res: dict, init: str = None, qform: str = None, mesh_file: str = None,
-                theta: tuple = None, mu: tuple = None, e_stop: tuple = None, steps: tuple = None):
+                theta: tuple = None, mu: tuple = None, e_stop: tuple = None, steps: tuple = None) -> filter:
     """ example:
         get_results(res, theta=(20,25), init='ani_parab', mu=(0,11.0))
     Tuples denote ranges
@@ -250,5 +259,4 @@ def filter_results(res: dict, init: str = None, qform: str = None, mesh_file: st
         # and mesh_file in (None, r['mesh_file'])
         return cond
 
-    filtered = filter(which, res.items())
-    return filtered
+    return filter(which, res.items())

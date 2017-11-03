@@ -32,23 +32,30 @@
            data-sorting="true" data-filtering="true" data-show-toggle="false"
            data-paging="true" data-paging-size="100"></table>
     <script src="/js/jquery-3.2.1.min.js"></script>
-    <script src="/js/jquery.floatThead.min.js"></script>
+    <!--<script src="/js/jquery.floatThead.min.js"></script>-->
+    <script src="/js/jquery.stickytableheaders.min.js"></script>
     <script src="/js/footable.min.js"></script>
     <script src="/js/jquery.alertable.min.js"></script>
     <script type="text/javascript">
     jQuery(function($) {
-      $('#results').footable({
+      $('#results').footable( {
         "columns": $.get('/api/columns'),
         "rows": $.get('/api/rows'),
         "on": { "postdraw.ft.table": function (e, ft) {
-            /*HACK! I need to delay moving the element or it will just disappear*/
-            $(e.currentTarget.tHead).delay(100).queue(function () {
-              $('tr.footable-filtering > th > .form-inline').prepend($('#control-btns'));
-              $('#results').floatThead();
-              $('#control-btns').css('display', 'inline-flex');});
-            }
-         }
-       });
+          /*HACK! I need to delay moving the element or it will just disappear*/
+          $(e.currentTarget.tHead).delay(100).queue(function () {
+            $('tr.footable-filtering > th > .form-inline').prepend($('#control-btns'));
+            /* FIXME: this breaks sorting!
+            See https://github.com/mkoryak/floatThead/issues/37
+            and https://github.com/mkoryak/bootstrap-sortable/commit/23004f565f80aed405120c34449b43c6e2ec1167
+            $('#results').floatThead();
+            */
+            $('#results').stickyTableHeaders();
+            $('#control-btns').css('display', 'inline-flex');
+            });
+          }
+        }
+      });
     });
 
     $('#delete').on('click', function() {

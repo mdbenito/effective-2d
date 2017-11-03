@@ -284,7 +284,7 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float,
     file_name = os.path.join(dir, fname_prefix + ".pvd")
     if create_dir:
         try:
-            os.mkdir(dir)
+            os.makedirs(dir)
         except FileExistsError:
             pass
 

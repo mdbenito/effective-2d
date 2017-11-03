@@ -1,0 +1,6 @@
+[Default Applications]
+
+# Add these two to the same section of ~/.local/share/applications/mimeapps.list
+
+x-scheme-handler/pvd=paraview.desktop
+application/x-paraview-data=paraview.desktop

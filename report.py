@@ -11,6 +11,8 @@ import matplotlib.pyplot as pl
 import pickle as pk
 from math import floor, log10
 import binascii
+import os
+
 
 class Data(object):
     def __init__(self):
@@ -80,12 +82,13 @@ class PickleData(Data):
             mm = floor((tt - hh * 3600) / 60)
             ss = floor((tt - hh * 3600 - mm * 60))
             row_data['time'] = "%02d:%02d:%02d" % (hh, mm, ss)
-            row_data['form_name'] = row.get('Q2').get('form_name')
-            row_data['e_stop'] = int(log10(row['e_stop'])) - 1
+            row_data['form_name'] = row.get('Q2', {}).get('form_name', 'N/A')
+            row_data['e_stop'] = int(log10(row.get('e_stop', 1))) - 1
             row_data['plot'] = '<a class="plot_one" href="#single_plot_target" data-value="%s" onclick="show_one(this)">Plot</a>' % key
-            row_data['results'] = ''
+            file_name = os.path.join(os.getcwd(), row.get('file_name', 'UNAVAILABLE'))
+            row_data['results'] = '<a href="pvd://%s">%s</a>' % (file_name, os.path.basename(file_name))
             row_data['form_arguments'] = ", ".join("%s: %f" % (k, v) for k, v in
-                                                    row.get('Q2').get('arguments').items())
+                                                    row.get('Q2', {}).get('arguments', {}).items())
             row_data['select'] = toggle_button(key)
             ret.append(row_data)
         return json.dumps(ret)

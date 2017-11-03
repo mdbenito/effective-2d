@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ParaView
+Comment=Parallel visualization application
+Exec=/home/miguel/local/opt/paraview/bin/paraview %F
+TryExec=/home/miguel/local/opt/paraview/bin/paraview
+Icon=/home/miguel/.local/share/icons/hicolor/96x96/apps/paraview.png
+MimeType=application/x-paraview-data;x-scheme-handler/pvd

@@ -77,7 +77,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
     max_line_search_steps = 20
     step = 0
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
-    _hist = {'init': init, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
+    _hist = {'init': init, 'impl': 'mixed', 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'dz': [], 'constraint': [],
              'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
              'symmetry': [], 'file_name': file_name}

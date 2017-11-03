@@ -9,6 +9,12 @@
     <link href="/css/jquery.alertable.css" rel="stylesheet"></link>
   </head>
   <body>
+  <!--HACK! force the style here to avoid CSS precedence nonsense-->
+    <div id="loading_div" class="footable-loader"
+         style="display:block; position: fixed; z-index: 999; width: 100%; height: 100%;
+          text-align: center; top: 0; left: 0; background: rgba(245,245,245,0.9)">
+      <span class="fooicon fooicon-loader"></span>
+    </div>
     <ul class="btn-list" id="control-btns">
       <li class="btn-list-item" style="margin-right: 5em; margin-left:-5em;">
         <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button>
@@ -86,6 +92,11 @@
        });
     });
     function show_one(e) { $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value')); }
+
+    var $loading = $('#loading_div').hide();
+    $(document)
+      .ajaxStart(function () { $loading.show(); })
+      .ajaxStop(function () { $loading.hide(); });
     </script>
   </body>
 </html>

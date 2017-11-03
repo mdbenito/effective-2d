@@ -118,8 +118,14 @@ class Handler(BaseHTTPRequestHandler):
       /columns
       /rows
       /plot_one/[key]
-    POST API:
-      /plot_multiple [list of keys]
+      /plot_multiple/key[,key]*
+      /reload
+      /delete/key[,key]*
+
+    ****************************************************************************
+    CAREFUL: delete is NOT SAFE!! There are a couple of obvious checks but they
+    can probably be circumvented
+    ****************************************************************************
     """
 
     def _set_headers(self, *args, content='application/json', charset='utf8'):
@@ -137,6 +143,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        """ Answers GET requests. """
+
+        # Emtpy paths lead to /index.html
         if self.path in ("", "/"):
             self.path = "/index.html"
         if re.match('/(css/.*|js/.*|fonts/.*|index.*)', self.path) is not None:
@@ -202,8 +211,33 @@ class Handler(BaseHTTPRequestHandler):
         elif re.match('/api/delete/', self.path) is not None:
             ids = self.path.split('/')[-1].split(',')
             deleted = []
+            files_deleted = 0
             for id in ids:
-                deleted.append(data.delete(id))
+                dir, file = os.path.split(data[id].get('file_name', ''))
+                try:
+                    # Be extra careful: a "safe" path to delete is not absolute, not .,
+                    # and contains only vtu and pvd files
+                    if not os.path.isabs(dir) and dir != "" and dir[0] != ".":
+                        dir = os.path.join(os.getcwd(), dir)
+                        for f in os.listdir(dir):
+                            _, ext = os.path.splitext(f)
+                            if ext in ('.pvd', '.vtu'):
+                                os.unlink(os.path.join(dir, f))
+                                files_deleted += 1
+                                # self.log_message("unlink: " + os.path.join(dir, f))
+                        os.rmdir(dir)
+                    tmp = data.delete(id)
+                    deleted.append(tmp)
+                    if tmp:
+                        self.log_message("Deleted item '%s' and %d files" % (id, files_deleted))
+                except Exception as e:
+                    self.log_error("%s [%s, %s]" % (str(e), dir, file))
+                    # TODO: report errors?
+            # Save if there was at least one deletion
+            for id in deleted:
+                if id is not None:
+                    data.save()
+                    break
             self._set_headers(200)
             json.dumps(deleted)
         else:

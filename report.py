@@ -149,28 +149,18 @@ class Handler(BaseHTTPRequestHandler):
 
         elif self.path.endswith('/api/columns'):
             self._set_headers(200)
-            # with open("report/columns.json", "rb") as fd:
-            #     shutil.copyfileobj(fd, self.wfile)
             self.wfile.write(bytes(data.columns(), 'utf-8'))
 
         elif self.path.endswith('/api/rows'):
             self._set_headers(200)
-            # with open("report/rows.json", "rb") as fd:
-            #     shutil.copyfileobj(fd, self.wfile)
             self.wfile.write(bytes(data.rows(), 'utf-8'))
 
         elif re.match('/api/plot_one/', self.path) is not None:
             key = self.path.split('/')[-1]
             if data[key] is not None:
-                if data[key]['steps'] < 200:
-                    beg, win = 10, 1
-                elif data[key]['steps'] < 1000:
-                    beg, win = 40, 20
-                else:
-                    beg, win = 50, 50
                 with io.BytesIO() as buf:
                     try:
-                        plots1(data[key], slice(beg, -1), win)
+                        plots1(data[key], None, None)
                         pl.savefig(buf, format='png')
                         pl.close()
                         buf.seek(0)
@@ -182,16 +172,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(400, 'Bad Request: run "%s" does not exist' % key)
         elif re.match('/api/plot_multiple/', self.path) is not None:
             ids = self.path.split('/')[-1].split(',')
-            steps = min([data[id]['steps'] for id in ids])
-            if steps < 200:
-                beg, win = 10, 1
-            elif steps < 1000:
-                beg, win = 40, 20
-            else:
-                beg, win = 50, 50
+
             with io.BytesIO() as buf:
                 try:
-                    plots4(data.get_multiple(ids), slice(beg, -1), win)
+                    plots4(data[ids], None, None)
                     pl.savefig(buf, format='png')
                     pl.close()
                     buf.seek(0)

@@ -21,8 +21,24 @@ def get_longest(res:dict, theta:float):
     return run
 
 
+def estimate_win_size(steps: list) -> (int, int):
+    """ Hideous hack """
+    m = min(steps)
+    if m < 200:
+        beg, win = 10, 1
+    elif m < 1000:
+        beg, win = 40, 20
+    else:
+        beg, win = 50, 50
+    return beg, win
+
+
 def plots1(history:dict, _slice=slice(0,-1), running_mean_window=1):
     h = history
+    if running_mean_window is None or _slice is None:
+        beg, running_mean_window = estimate_win_size([h['steps']])
+        _slice = slice(beg, -1)
+
     pl.figure(figsize=(18,12), )
     pl.suptitle("'%s', $\\theta = %.3e$, $\mu = %.2e$, $\\epsilon = %.2e$"
                 % (h['init'], h['theta'], h['mu'], h['e_stop']))
@@ -102,6 +118,11 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1):
         _runs = [v for k, v in sorted(runs, key=lambda x: x[1]['theta'])]
     elif isinstance(runs, dict):
         _runs = [v for k, v in sorted(runs.items(), key=lambda x: x[1]['theta'])]
+
+    if running_mean_window is None or _slice is None:
+        beg, running_mean_window = estimate_win_size([r['steps'] for r in _runs])
+        _slice = slice(beg, -1)
+
     pl.figure(figsize=(18, 12), )
     pl.suptitle("'%s'" % _runs[0]['init'])
     pl.subplot(3, 2, 1)

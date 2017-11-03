@@ -88,7 +88,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
     def energy(u, v, z, mu=mu):
         J = (theta / 2) * Q2(eps(u) + outer(grad(v), grad(v)) / 2) * dx(msh) \
             + (1. / 24) * Q2(grad(z) - B) * dx(msh) \
-            + (1. / 2) * mu * inner(z - grad(v), z - grad(v)) * dx(msh)
+            + mu * inner(z - grad(v), z - grad(v)) * dx(msh)
         return assemble(J)
 
     # CAREFUL!! Picking the right scalar product here is essential
@@ -130,7 +130,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
         dJ = theta * L2(eps(u_) + outer(grad(v_), grad(v_)) / 2,
                         eps(phi) + sym(outer(grad(v_), grad(psi)))) * dx(msh) \
              + (1. / 12) * L2(grad(z_) - B, grad(eta)) * dx(msh) \
-             + mu * inner(grad(v_) - z_, grad(psi) - eta) * dx(msh)
+             + 2. * mu * inner(grad(v_) - z_, grad(psi) - eta) * dx(msh)
 
         debug("\tSolving...", end='')
         solve(L == -dJ, dw, [])

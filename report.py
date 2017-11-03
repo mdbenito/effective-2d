@@ -14,18 +14,15 @@ import binascii
 import os
 
 
-class Data(object):
-    def __init__(self):
-        pass
+class PickleData(object):
+    """ A simple interface around the dict of results with all runs.
 
-    def __getitem__(self, item):
-        pass
-
-    def columns(self):
-        pass
-
-
-class PickleData(Data):
+    Data is stored in a pickle, so it is necessarily written only in
+    bulk with save(). This is slow and can cause data loss if the server
+    writes at the same time that some simulation does, for instance.
+    TODO: ditch this and use some database.
+    TODO: templatize the format of row data (css classes etc.)
+    """
     def __init__(self, model):
         super().__init__()
         self.results_file = 'results-%s-combined.pickle' % model
@@ -39,11 +36,30 @@ class PickleData(Data):
             results = {}
         self._results = OrderedDict(sorted(results.items(), key=lambda x: x[1]['theta']))
 
-    def __getitem__(self, item):
-        return self._results.get(item)
+    def __getitem__(self, item_s):
+        if isinstance(item_s, str):
+            return self._results.get(item_s, {})
+        elif isinstance(item_s, list):
+            return {k: v for k, v in self._results.items() if k in item_s}
+        else:
+            return None
+
+    def save(self):
+        """ Dump all of the data back into the pickle.
+        TODO: don't convert back to dict upon saving?
+        """
+        try:
+            print("Saving database... ", end='')
+            with open(self.results_file, "wb") as fd:
+                pk.dump(dict(self._results), fd)
+            print("done.")
+        except Exception as e:  # Pokemon!
+            print("ERROR: " % str(e))
 
     def delete(self, item):
-        # TODO: save modified results to disk...
+        """ Deletes one item from the store.
+        Remember that the data is not saved not disk unless save() is called.
+        """
         try:
             # from sys import stderr
             # stderr.write("Would delete: " + item)
@@ -53,6 +69,7 @@ class PickleData(Data):
             return None
 
     def columns(self):
+        """ Returns a json string with the colum data for footable. """
         cols = [{'name': 'form_name', 'title': 'Q2'},
                 {'name': 'init', 'title': 'Initial data'},
                 {'name': 'theta', 'title': 'theta', 'type': 'number'},
@@ -67,6 +84,7 @@ class PickleData(Data):
         return json.dumps(cols)
 
     def rows(self):
+        """ Returns a json dict with the row data for footable. """
         def toggle_button(id:str) -> str:
             input = '<input class="tgl tgl-flat" id="%s" type="checkbox"/>' % id
             label = '<label class="tgl-btn" for="%s"></label>' % id
@@ -92,9 +110,6 @@ class PickleData(Data):
             row_data['select'] = toggle_button(key)
             ret.append(row_data)
         return json.dumps(ret)
-
-    def get_multiple(self, ids:list) -> dict:
-        return {k:v for k, v in self._results.items() if k in ids}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -213,8 +228,10 @@ def run(server_class=HTTPServer, handler_class=Handler, port=8080):
 if __name__ == "__main__":
     from sys import argv
 
+    # Disable interactive plots
     pl.ioff()
-    # HACK: remove with DB connection
+
+    # HACK: replace with DB connection
     data = PickleData('curl')
 
     if len(argv) == 2:

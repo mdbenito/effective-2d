@@ -7,7 +7,7 @@ import mshr
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
            "compute_potential", "save_results", "generate_mesh", "frobenius_form", "isotropic_form",
-           "filter_results"]
+           "filter_results", "make_filename"]
 
 
 def make_initial_data_mixed(which: str, degree=2) -> Expression:
@@ -178,7 +178,8 @@ def name_run(r:dict) -> str:
     """ Returns a 'unique' string identifier for the given run.
     Should be enough :/
     """
-    return "%s_%08.3f_%3.1f_%.2e_%d" % (r['init'], r['theta'], r['mu'], r['e_stop'], r['steps'])
+    return "%s_%s_%08.3f_%3.1f_%.2e_%d" % (r['impl'], r['init'], r['theta'],
+                                           r['mu'], r['e_stop'], r['steps'])
 
 
 def save_results(results: list, results_file: str):
@@ -200,7 +201,8 @@ def save_results(results: list, results_file: str):
 
 
 def generate_mesh(kind:str, m:int, n:int) -> str:
-    """ (Cached) Generates a mesh, saves it to a file and returns the file name
+    """ Generates a mesh, saves it to a file and returns the file name.
+    Generation is only performed once.
      """
     mesh_file = 'mesh-%dx%d-%s.xml.gz' % (m, n, kind)
 
@@ -244,9 +246,16 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
 
 def filter_results(res: dict, init: str = None, qform: str = None, mesh_file: str = None,
                 theta: tuple = None, mu: tuple = None, e_stop: tuple = None, steps: tuple = None) -> filter:
-    """ example:
+    """ Filters a results dictionary by multiple, inclusive, criteria.
+
+    Tuples are used to denote ranges
+
+    Example
+    -------
         get_results(res, theta=(20,25), init='ani_parab', mu=(0,11.0))
-    Tuples denote ranges
+    Returns
+    -------
+        A dict {'canonical-experiment-name' : {experiment data}, ...}
     """
 
     def which(x: tuple):
@@ -260,3 +269,23 @@ def filter_results(res: dict, init: str = None, qform: str = None, mesh_file: st
         return cond
 
     return filter(which, res.items())
+
+
+def make_filename(model: str, init: str, q2name: str, theta: float, mu: float,
+               create_dir: bool = False) -> str:
+    """ Creates a canonical file name and directory from model data.
+    Also creates the dir for convenience if asked to.
+    Returns
+    -------
+        Full path to PVD file.
+    """
+    fname_prefix = "%s-%s-%09.4f-%05.2f-" % (init, q2name, theta, mu)
+    dir = os.path.join("output-" + model, fname_prefix.strip('-'))
+    file_name = os.path.join(dir, fname_prefix + ".pvd")
+    if create_dir:
+        try:
+            os.mkdir(dir)
+        except FileExistsError:
+            pass
+
+    return file_name

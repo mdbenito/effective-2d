@@ -25,7 +25,6 @@
 
 from dolfin import *
 import numpy as np
-import os
 from tqdm import tqdm
 from common import *
 from time import time
@@ -70,13 +69,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    fname_prefix = "%s-%s-%08.3f-%05.2f-" % (init, qform, theta, mu)
-    dir = "output-curl/" + fname_prefix.strip('-')
-    try:
-        os.mkdir(dir)
-    except:
-        pass
-    file_name = dir + "/" + fname_prefix + ".pvd"
+    file_name = make_filename('curl', init, qform, theta, mu, create_dir=True)
     file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)

@@ -148,7 +148,7 @@ class Handler(BaseHTTPRequestHandler):
         # Emtpy paths lead to /index.html
         if self.path in ("", "/"):
             self.path = "/index.html"
-        if re.match('/(css/.*|js/.*|fonts/.*|index.*)', self.path) is not None:
+        if re.match('/(css/.*|js/.*|fonts/.*|index.*|favicon.*.ico)', self.path) is not None:
             mimetypes = {
                 "html": "text/html",
                 "js": "text/javascript",  # I guess these two are wrong but who cares
@@ -158,7 +158,8 @@ class Handler(BaseHTTPRequestHandler):
                 "svg": "image/svg+xml",
                 "ttf": "application/font-sfnt",
                 "woff": "application/font-woff",
-                "woff2": "font/woff2"}
+                "woff2": "font/woff2",
+                "ico": "image/x-icon"}
             fname = self.path.split('?')[0]  # ignore url arguments
             with open("report/" + fname.lstrip('/'), "rb") as fd:
                 #self.log_message("Serving file: %s" % fname)
@@ -268,7 +269,7 @@ if __name__ == "__main__":
     pl.ioff()
 
     # HACK: replace with DB connection
-    data = PickleData('curl')
+    data = PickleData('mixed')
 
     if len(argv) == 2:
         run(port=int(argv[1]))

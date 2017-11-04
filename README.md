@@ -26,11 +26,25 @@ are available in my forks but are quite hacky and not thoroughly tested.
 Results of the computations are stored both as VTK files in folders and as
 pickled objects containing relevant quantities gathered during the
 computations. It is ugly and should probably be replaced by some database like
-sqlite or some document store / nosql thingy.
+sqlite or some document store / nosql thingy. 
+
+### Reports
+
+The script `report.py` implements a minimal web server to explore results in tabular
+form and easily combine them into plots. Not *very* useful, but it was fun and quick
+to do. The nice jQuery table is done with [FooTable](http://fooplugins.github.io/FooTable/),
+the fixed header with [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
+I also used some js and css from [codepen](https://codepen.io).
+
+To use it just run
+
+```shell
+python3 report.py
+```
 
 ## Contents
 
-* `descent.py`: Gradient descent for a modified functional with only first
+* `descent-curl.py`: Gradient descent for a modified functional with only first
   order derivatives and a penalty term enforcing the condition that 
   $z = \nabla v$. The fact that the penalty term can be left out provides
   some experimental evidence that minimisers of the new functional automatically
@@ -43,9 +57,7 @@ sqlite or some document store / nosql thingy.
 * `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
 * `von Karman mixed.ipynb`: Implementation of the model in [2] using a
   mixed model formulation. (Not working)
-* `report.py`: A minimal web server to explore results in tabular form and
-  easily combine them into plots. Not *very* useful, but it was fun and quick
-  to do.
+* `report.py`
 
 ## Dependencies
 
@@ -62,13 +74,14 @@ sqlite or some document store / nosql thingy.
   still running.
 * Be more systematic with "unique" identifiers for runs (crappy and fragile now).
 * Make the reports more flexible. Possibly ditch that webserver nonsense
-  altogether and implement some cool iPython widgets (or even just use something
-  like [qgrid](https://github.com/quantopian/qgrid)).
-
+  altogether and implement some cool iPython widgets based on pandas dataframes
+  (or even just use something like [qgrid](https://github.com/quantopian/qgrid)).
+* Update licenses and acknowledgements to include all packages used.
 
 ## License
 
-All code released under the GNU GPL v3.
+All my code is released under the GNU GPL v3. See the licenses of the included
+software too.
 
 ## References
 

@@ -1,102 +1,144 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <title>Results</title>
-    <meta charset="utf-8"></meta>
-    <link href="/css/footable.standalone.min.css" rel="stylesheet"></link>
-    <link href="/css/font-awesome.min.css" rel="stylesheet"></link>
-    <link href="/css/main.css" rel="stylesheet"></link>
-    <link href="/css/jquery.alertable.css" rel="stylesheet"></link>
-  </head>
-  <body>
-  <!--HACK! force the style here to avoid CSS precedence nonsense-->
-    <div id="loading_div" class="footable-loader"
-         style="display:block; position: fixed; z-index: 999; width: 100%; height: 100%;
+<head>
+  <title>Results</title>
+  <meta charset="utf-8"></meta>
+  <link href="/css/footable.standalone.min.css" rel="stylesheet"></link>
+  <link href="/css/font-awesome.min.css" rel="stylesheet"></link>
+  <link href="/css/main.css" rel="stylesheet"></link>
+  <link href="/css/jquery.alertable.css" rel="stylesheet"></link>
+</head>
+<body>
+<!--HACK! force the style here to avoid CSS precedence nonsense-->
+<div id="loading_div" class="footable-loader"
+     style="display:block; position: fixed; z-index: 999; width: 100%; height: 100%;
           text-align: center; top: 0; left: 0; background: rgba(245,245,245,0.9)">
-      <span class="fooicon fooicon-loader"></span>
-    </div>
-    <ul class="btn-list" id="control-btns">
-      <li class="btn-list-item" style="margin-right: 5em; margin-left:-5em;">
-        <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button>
-      </li>
-      </li>
-      <li class="btn-list-item">
-        <button class="btn btn-primary" type="button" id="delete">Delete selected</button>
-      <li class="btn-list-item">
-        <button class="btn btn-primary" type="button" id="reload">Reload</button></li>
-    </ul>
+  <span class="fooicon fooicon-loader"></span>
+</div>
+<ul class="btn-list" id="control-btns">
+  <li class="btn-list-item" style="margin-right: 5em; margin-left:-5em;">
+    <button class="btn btn-primary" type="button" id="delete">Delete selected</button>
+  </li>
+  </li>
+  <li class="btn-list-item">
+    <button class="btn btn-primary" type="button" id="plot_multiple">Plot selected</button>
+  <li class="btn-list-item">
+    <button class="btn btn-primary" type="button" id="reload">Reload</button></li>
+</ul>
 
-    <!-- lightbox container hidden with CSS -->
-    <a href="#_" class="lightbox" id="multiple_plot_target">
-      <img id="multiple_plot" src="">
-    </a>
+<!-- lightbox container hidden with CSS -->
+<a href="#_" class="lightbox" id="multiple_plot_target">
+  <img id="multiple_plot" src="">
+</a>
 
-    <a href="#_" class="lightbox" id="single_plot_target">
-      <img id="single_plot" src="">
-    </a>
+<a href="#_" class="lightbox" id="single_plot_target">
+  <img id="single_plot" src="">
+</a>
 
-    <table class="table" id="results"
-           data-sorting="true" data-filtering="true" data-show-toggle="false"
-           data-paging="true" data-paging-size="100"></table>
-    <script src="/js/jquery-3.2.1.min.js"></script>
-    <!--<script src="/js/jquery.floatThead.min.js"></script>-->
-    <script src="/js/jquery.stickytableheaders.min.js"></script>
-    <script src="/js/footable.min.js"></script>
-    <script src="/js/jquery.alertable.min.js"></script>
-    <script type="text/javascript">
-    jQuery(function($) {
-      $('#results').footable( {
-        "columns": $.get('/api/columns'),
-        "rows": $.get('/api/rows'),
-        "on": { "postdraw.ft.table": function (e, ft) {
-          /*HACK! I need to delay moving the element or it will just disappear*/
-          $(e.currentTarget.tHead).delay(100).queue(function () {
-            $('tr.footable-filtering > th > .form-inline').prepend($('#control-btns'));
+<table class="table" id="results"
+       data-sorting="true" data-filtering="true" data-show-toggle="false"
+       data-paging="true" data-paging-size="100"></table>
+<script src="/js/jquery-3.2.1.min.js"></script>
+<!--<script src="/js/jquery.floatThead.min.js"></script>-->
+<script src="/js/jquery.stickytableheaders.min.js"></script>
+<script src="/js/footable.min.js"></script>
+<script src="/js/jquery.alertable.min.js"></script>
+<script type="text/javascript">
+
+    var btns = $('#control-btns');
+
+    /**
+     * Move the additional buttons into footable's header.
+     */
+    function fix_header(e, ft) {
+        /*HACK! I need to delay moving the element or it will just disappear*/
+        $(e.currentTarget.tHead).delay(200).queue(function () {
+            btns.detach();
+            ft.$el.find('.form-inline').prepend(btns);
             /* FIXME: this breaks sorting!
             See https://github.com/mkoryak/floatThead/issues/37
             and https://github.com/mkoryak/bootstrap-sortable/commit/23004f565f80aed405120c34449b43c6e2ec1167
             $('#results').floatThead();
             */
-            $('#results').stickyTableHeaders();
-            $('#control-btns').css('display', 'inline-flex');
+            ft.$el.stickyTableHeaders();
+            btns.css('display', 'inline-flex');
+        });
+    }
+
+    /**
+     * Change the src of the lightshow div where single plots are drawn, so that it
+     * is activated (by the :target property in CSS) and diplays the image.
+     * @param e
+     */
+    function show_one(e) {
+        $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value'));
+    }
+
+    /** Reloads all data
+     * FIXME: this is not working!
+     * @param ft footable instance
+     * @param btn jquery object with the clicked button (to disable/enable it while loading)
+     */
+    function reload_data(ft, btn) {
+        return function() {
+            var numrows = 0;
+            var txt = btn.text();
+            btn.prop('disabled', true).text('...');
+            console.log("Reloading...");
+            $.get('/api/rows').done(function(data) {
+                ft.rows.load(data, false);  // don't append
+                numrows = data.length
+                console.log(numrows + " rows read.")
+            }).then(function () {
+                btn.prop('disabled', false).text(txt);
             });
-          }
         }
-      });
-    });
+    }
 
-    $('#delete').on('click', function() {
-    var active = $('.tgl:checked').map(function () { return this.id; }).get();
-    $.alertable.confirm('Delete: ' + active.join()).then(function() {
-       $.get("/api/delete/" + active.join(), function(data) {
-       console.log("Reloading.");
-       $('#results').footable({ "columns": $.get('/api/columns'), "rows": $.get('/api/rows')});
-        /*console.log("Deleted: " + data);*/ });
-    }, function() {
-      console.log('Deletion canceled');
-    });
-  });
-
-    $('#plot_multiple').on('click', function(e) {
-      var active = $('.tgl:checked').map(function () { return this.id; }).get();
-      $.get("/api/plot_multiple/" + active.join(), function(data) {
-        $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
-        var url = location.href
-        location.href = "#multiple_plot_target";
-        history.replaceState(null,null,url);
-      });
-    });
-    $('#reload').on('click', function(e) {
-       $.get("/api/reload", function(data) {
-          $('#results').footable({ "columns": $.get('/api/columns'), "rows": $.get('/api/rows')});
-       });
-    });
-    function show_one(e) { $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value')); }
-
+    /**
+     * Hide the loading spinning wheel unless an ajax request is ongoing.
+     *
+     */
     var $loading = $('#loading_div').hide();
     $(document)
-      .ajaxStart(function () { $loading.show(); })
-      .ajaxStop(function () { $loading.hide(); });
-    </script>
-  </body>
+        .ajaxStart(function () { $loading.show(); })
+        .ajaxStop(function () { $loading.hide(); });
+
+    jQuery(function($) {
+        var ft = FooTable.init('#results', {
+            "columns": $.get('/api/columns').fail(function () {
+                $.alertable.error("Couldn't load column data.")}),
+            "rows": $.get('/api/rows').fail(function() {
+                $.alertable.error("Couldn't load row data.")}),
+            "on": { "postdraw.ft.table": fix_header }
+        });
+
+        $('#delete').on('click', function(e) {
+            e.preventDefault();
+            var active = $('.tgl:checked').map(function () { return this.id; }).get();
+            $.alertable.confirm('Delete: ' + active.join()).then(function() {
+                $.get("/api/delete/" + active.join()).done(reload_data(ft, $(e.currentTarget)));
+            }, function(e) {
+                console.log('Deletion canceled');
+            });
+        });
+
+        $('#plot_multiple').on('click', function(e) {
+            e.preventDefault();
+            var active = $('.tgl:checked').map(function () { return this.id; }).get();
+            $.get("/api/plot_multiple/" + active.join(), function(data) {
+                $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
+                var url = location.href;
+                location.href = "#multiple_plot_target";
+                history.replaceState(null, "", url);
+            });
+        });
+
+        $('#reload').on('click', function(e) {
+            e.preventDefault();
+            $.get("/api/reload").done(reload_data(ft, $(e.currentTarget)));
+        });
+    });
+</script>
+</body>
 </html>

@@ -170,6 +170,8 @@ class Handler(BaseHTTPRequestHandler):
             global data
             data = PickleData('curl')
             self._set_headers(200)
+            # quite redundant, but jQuery expects something
+            self.wfile.write(bytes(json.dumps({'command':'reload', 'status': 'ok'}), 'utf-8'))
 
         elif self.path.endswith('/api/columns'):
             self._set_headers(200)

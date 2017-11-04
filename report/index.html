@@ -38,71 +38,20 @@
 <table class="table" id="results"
        data-sorting="true" data-filtering="true" data-show-toggle="false"
        data-paging="true" data-paging-size="100"></table>
+
+<script src="/js/misc.js"></script>
 <script src="/js/jquery-3.2.1.min.js"></script>
 <!--<script src="/js/jquery.floatThead.min.js"></script>-->
 <script src="/js/jquery.stickytableheaders.min.js"></script>
 <script src="/js/footable.min.js"></script>
 <script src="/js/jquery.alertable.min.js"></script>
 <script type="text/javascript">
-
-    var btns = $('#control-btns');
-
-    /**
-     * Move the additional buttons into footable's header.
-     */
-    function fix_header(e, ft) {
-        /*HACK! I need to delay moving the element or it will just disappear*/
-        $(e.currentTarget.tHead).delay(200).queue(function () {
-            btns.detach();
-            ft.$el.find('.form-inline').prepend(btns);
-            /* FIXME: this breaks sorting!
-            See https://github.com/mkoryak/floatThead/issues/37
-            and https://github.com/mkoryak/bootstrap-sortable/commit/23004f565f80aed405120c34449b43c6e2ec1167
-            $('#results').floatThead();
-            */
-            ft.$el.stickyTableHeaders();
-            btns.css('display', 'inline-flex');
-        });
-    }
-
-    /**
-     * Change the src of the lightshow div where single plots are drawn, so that it
-     * is activated (by the :target property in CSS) and diplays the image.
-     * @param e
-     */
-    function show_one(e) {
-        $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value'));
-    }
-
-    /** Reloads all data
-     * FIXME: this is not working!
-     * @param ft footable instance
-     * @param btn jquery object with the clicked button (to disable/enable it while loading)
-     */
-    function reload_data(ft, btn) {
-        return function() {
-            var numrows = 0;
-            var txt = btn.text();
-            btn.prop('disabled', true).text('...');
-            console.log("Reloading...");
-            $.get('/api/rows').done(function(data) {
-                ft.rows.load(data, false);  // don't append
-                numrows = data.length
-                console.log(numrows + " rows read.")
-            }).then(function () {
-                btn.prop('disabled', false).text(txt);
-            });
-        }
-    }
-
-    /**
-     * Hide the loading spinning wheel unless an ajax request is ongoing.
-     *
-     */
-    var $loading = $('#loading_div').hide();
+    var control_buttons = $('#control-btns');
+     // Show a spinning wheel whenever an ajax request is ongoing.
+    var loading = $('#loading_div').hide();
     $(document)
-        .ajaxStart(function () { $loading.show(); })
-        .ajaxStop(function () { $loading.hide(); });
+        .ajaxStart(function () { loading.show(); })
+        .ajaxStop(function () { loading.hide(); });
 
     jQuery(function($) {
         var ft = FooTable.init('#results', {
@@ -110,34 +59,12 @@
                 $.alertable.error("Couldn't load column data.")}),
             "rows": $.get('/api/rows').fail(function() {
                 $.alertable.error("Couldn't load row data.")}),
-            "on": { "postdraw.ft.table": fix_header }
+            "on": { "postdraw.ft.table": fix_header(control_buttons) }
         });
 
-        $('#delete').on('click', function(e) {
-            e.preventDefault();
-            var active = $('.tgl:checked').map(function () { return this.id; }).get();
-            $.alertable.confirm('Delete: ' + active.join()).then(function() {
-                $.get("/api/delete/" + active.join()).done(reload_data(ft, $(e.currentTarget)));
-            }, function(e) {
-                console.log('Deletion canceled');
-            });
-        });
-
-        $('#plot_multiple').on('click', function(e) {
-            e.preventDefault();
-            var active = $('.tgl:checked').map(function () { return this.id; }).get();
-            $.get("/api/plot_multiple/" + active.join(), function(data) {
-                $('#multiple_plot').attr('src', 'data:image/jpeg;base64, ' + data);
-                var url = location.href;
-                location.href = "#multiple_plot_target";
-                history.replaceState(null, "", url);
-            });
-        });
-
-        $('#reload').on('click', function(e) {
-            e.preventDefault();
-            $.get("/api/reload").done(reload_data(ft, $(e.currentTarget)));
-        });
+        $('#delete').on('click', handle_delete(ft));
+        $('#plot_multiple').on('click', handle_plot_multiple(ft));
+        $('#reload').on('click', handle_reload(ft));
     });
 </script>
 </body>

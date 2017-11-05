@@ -26,15 +26,18 @@ class PickleData(object):
     def __init__(self, model):
         super().__init__()
         self.results_file = 'results-%s-combined.pickle' % model
+        self._results = {}
+        self.load()
+
+    def load(self):
         try:
             print("Loading database... ", end='')
             with open(self.results_file, "rb") as fd:
                 results = pk.load(fd)
             print("done.")
+            self._results = OrderedDict(sorted(results.items(), key=lambda x: x[1]['theta']))
         except FileNotFoundError:
             print("ERROR: results file '%s' not found" % self.results_file)
-            results = {}
-        self._results = OrderedDict(sorted(results.items(), key=lambda x: x[1]['theta']))
 
     def __getitem__(self, item_s):
         if isinstance(item_s, str):
@@ -54,7 +57,7 @@ class PickleData(object):
                 pk.dump(dict(self._results), fd)
             print("done.")
         except Exception as e:  # Pokemon!
-            print("ERROR: " % str(e))
+            print("ERROR: " + str(e))
 
     def delete(self, item):
         """ Deletes one item from the store.
@@ -168,8 +171,7 @@ class Handler(BaseHTTPRequestHandler):
                 shutil.copyfileobj(fd, self.wfile)
 
         elif self.path.endswith('/api/reload'):
-            global data
-            data = PickleData('curl')
+            data.load()
             self._set_headers(200)
             # quite redundant, but jQuery expects something
             self.wfile.write(bytes(json.dumps({'command':'reload', 'status': 'ok'}), 'utf-8'))

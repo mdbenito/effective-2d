@@ -84,8 +84,10 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     if qform == 'frobenius':
         Q2, L2 = frobenius_form()
     elif qform == 'isotropic':
-        # Isotropic density for some material or other...
-        E, nu = 1e9, 0.3
+        # Isotropic density for steel at room temp.
+        # E is in GPa. Is it ok to use these units? Setting it to 210e9
+        # breaks things (line searches don't end)
+        E, nu = 210.0, 0.3
         Q2, L2 = isotropic_form(E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 + 2 * nu))
     else:
         raise Exception("Unknown quadratic form name '%s'" % qform)

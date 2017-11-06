@@ -22,13 +22,13 @@ def get_longest(res:dict, theta:float):
 
 def estimate_win_size(steps: list) -> (int, int):
     """ Hideous hack """
-    m = min(steps)
+    m = max(steps)
     if m < 200:
         beg, win = 10, 1
     elif m < 1000:
-        beg, win = 40, 20
+        beg, win = 50, 40
     else:
-        beg, win = 50, 50
+        beg, win = 100, 80
     return beg, win
 
 

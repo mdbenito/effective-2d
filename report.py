@@ -74,17 +74,20 @@ class PickleData(object):
 
     def columns(self):
         """ Returns a json string with the colum data for footable. """
-        cols = [{'name': 'form_name', 'title': 'Q2'},
+        cols = [{'name': 'impl', 'title': 'Impl.'},
+                {'name': 'form_name', 'title': 'Q2'},
                 {'name': 'init', 'title': 'Initial data'},
                 {'name': 'theta', 'title': 'theta', 'type': 'number'},
                 {'name': 'mu', 'title': 'mu', 'type': 'number'},
                 {'name': 'e_stop', 'title': 'eps order', 'type': 'number'},
-                {'name': 'steps', 'title': 'Steps', 'type': 'number'},
-                {'name': 'time', 'title': 'Duration', 'type': 'time'},
-                {'name': 'plot', 'title': '', 'type': 'html'},
-                {'name': 'results', 'type': 'html', 'breakpoints': 'all', 'title': 'results file:'},
-                {'name': 'form_arguments', 'breakpoints': 'all', 'title': 'form arguments:'},
-                {'name': 'select', 'title': ''}]
+                {'name': 'steps', 'title': 'Steps', 'type': 'number', 'filterable': False},
+                {'name': 'time', 'title': 'Duration', 'type': 'time', 'filterable': False},
+                {'name': 'plot', 'title': '', 'type': 'html', 'filterable': False},
+                {'name': 'results', 'type': 'html', 'breakpoints': 'all',
+                 'title': 'results file:', 'filterable': False},
+                {'name': 'form_arguments', 'breakpoints': 'all',
+                 'title': 'form arguments:', 'filterable': False},
+                {'name': 'select', 'title': '', 'filterable': False}]
         return json.dumps(cols)
 
     def rows(self):
@@ -96,7 +99,8 @@ class PickleData(object):
 
         ret = []
         for key, row in self._results.items():
-            row_data = {col: val for col, val in row.items() if col in ('init', 'steps')}
+            row_data = {col: val for col, val in row.items()
+                        if col in ('impl', 'init', 'steps')}
             row_data['theta'] = round(row['theta'], 3)
             row_data['mu'] = round(row['mu'], 2)
             tt = max(0, row.get('time', 0))

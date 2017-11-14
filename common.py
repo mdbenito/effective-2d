@@ -209,7 +209,7 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
     if not os.path.isfile(mesh_file):
         if kind.lower() == 'circle':
             domain = mshr.Circle(Point(0.0, 0.0), 1, m)
-            msh = mshr.generate_mesh(domain, 18)
+            msh = mshr.generate_mesh(domain, n)
         elif kind.lower == 'rectangle':
             msh = RectangleMesh(Point(-1, -1), Point(1, 1), m, n)
         else:

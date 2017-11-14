@@ -6,7 +6,8 @@ import json
 import io
 import re
 import shutil
-from plots import *
+import importlib
+import plots
 import matplotlib.pyplot as pl
 import pickle as pk
 from math import floor, log10
@@ -140,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
     def _image_headers(self):
         self.send_response(200)
         self.send_header('Pragma', 'public')
-        self.send_header('Cache-Control', 'max-age=86400')
+        self.send_header('Cache-Control', 'max-age=1')
         # self.send_header('Expires', gmdate('D, d M Y H:i:s \G\M\T', time() + 86400));
         self.send_header('Content-Type', 'image/png')
         self.end_headers()
@@ -172,6 +173,8 @@ class Handler(BaseHTTPRequestHandler):
 
         elif self.path.endswith('/api/reload'):
             data.load()
+            # HACK in order to tweak the plots on the fly
+            importlib.reload(plots)
             self._set_headers(200)
             # quite redundant, but jQuery expects something
             self.wfile.write(bytes(json.dumps({'command':'reload', 'status': 'ok'}), 'utf-8'))
@@ -189,7 +192,7 @@ class Handler(BaseHTTPRequestHandler):
             if data[key] is not None:
                 with io.BytesIO() as buf:
                     try:
-                        plots1(data[key], None, None)
+                        plots.plots1(data[key], None, None)
                         pl.savefig(buf, format='png')
                         pl.close()
                         buf.seek(0)
@@ -204,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
 
             with io.BytesIO() as buf:
                 try:
-                    plots4(data[ids], None, None)
+                    plots.plots4(data[ids], None, None)
                     pl.savefig(buf, format='png')
                     pl.close()
                     buf.seek(0)

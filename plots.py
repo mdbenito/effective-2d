@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from dolfin import plot, norm
 import numpy as np
 import matplotlib.pyplot as pl
 
@@ -23,13 +22,13 @@ def get_longest(res:dict, theta:float):
 
 def estimate_win_size(steps: list) -> (int, int):
     """ Hideous hack """
-    m = min(steps)
+    m = max(steps)
     if m < 200:
         beg, win = 10, 1
     elif m < 1000:
-        beg, win = 40, 20
+        beg, win = 50, 40
     else:
-        beg, win = 50, 50
+        beg, win = 100, 80
     return beg, win
 
 
@@ -63,6 +62,15 @@ def plots1(history:dict, _slice=slice(0,-1), running_mean_window=1):
 
 
 def plots2(history:dict):
+    # Check in case we are imported from report.py, which doesn't
+    # require a dolfin installation and doesn't use this function
+    # anyway
+    try:
+        from dolfin import plot, norm
+    except ImportError:
+        import sys
+        sys.stderr.write("Could not import dolfin.")
+        return        
     h = history
     pl.figure(figsize=(18,18))
     pl.subplot(2,2,1)

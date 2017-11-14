@@ -24,9 +24,9 @@ class PickleData(object):
     TODO: ditch this and use some database.
     TODO: templatize the format of row data (css classes etc.)
     """
-    def __init__(self, model):
+    def __init__(self, filename):
         super().__init__()
-        self.results_file = 'results-%s-combined.pickle' % model
+        self.results_file = filename
         self._results = {}
         self.load()
 
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     pl.ioff()
 
     # HACK: replace with DB connection
-    data = PickleData('mixed')
+    data = PickleData('results-combined.pickle')
 
     if len(argv) == 2:
         run(port=int(argv[1]))

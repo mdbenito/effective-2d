@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     set_log_level(ERROR)
 
-    results_file = "results-curl-combined.pickle"
+    results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
     theta_values = np.arange(8.681, 8.690, 0.002)
 

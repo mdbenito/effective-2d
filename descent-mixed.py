@@ -211,7 +211,7 @@ if __name__ == '__main__':
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
-    results_file = "results-mixed-combined.pickle"
+    results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
     theta_values = np.arange(20, 24, 1.0, dtype=float)
 

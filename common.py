@@ -86,8 +86,9 @@ def circular_symmetry(disp: Function) -> float:
 circular_symmetry.pts = None
 
 
-def compute_potential(z: Function, V: FunctionSpace) -> Function:
-    """ Takes a gradient and computes its potential (up to a constant)
+def compute_potential(z: Function, V: FunctionSpace, dirichlet:FacetFunction=None,
+                      MARKER:int=1, value: float = 0.0) -> Function:
+    """ Takes a gradient and computes its potential.
 
     We solve the linear problem:
      Find $(p,q) \in W = V \times Z_{\Gamma_D}$ such that for all $(\phi,
@@ -96,16 +97,20 @@ def compute_potential(z: Function, V: FunctionSpace) -> Function:
       $$(\nabla p - q, \nabla \phi)_{L^2}- (\nabla p - q, \psi)_{L^2} +
       (q, \psi)_{L^2} = (z, \psi)_{L^2} $$
 
-    Note that we would need to set Dirichlet conditions on the
-    potential to fix the constant.
+    Under the boundary conditions:
+      $ \nabla p = q $ at the boundary
+      $ p = 0 $ at the SubDomain 'zero'
 
     Arguments
     ---------
-        z: gradient
-        V: space for the potential
+        :param z: gradient
+        :param V: space for the potential
+        :param dirichlet: subdomain where the potential is fixed to 'value' (mark is 'MARK')
+        :param value: value that the potential takes at 'zero'
+        :param MARKER: value that the FacetFunction takes at the Dirichlet subdomain
     Returns
     -------
-        Function $v \in V$ such that $\nabla v = z$
+        Function $v \in V$ such that $\nabla v = z$ and $v = \text{value}$ on 'dirichlet'
     """
     msh = z.function_space().mesh()
 
@@ -120,11 +125,9 @@ def compute_potential(z: Function, V: FunctionSpace) -> Function:
         def inside(self, x, on_boundary):
             return on_boundary
 
-    class ValuesBoundary(SubDomain):
-        def inside(self, x, on_boundary):
-            return False
-
-    bcP = DirichletBC(W.sub(0), Constant(42.0), ValuesBoundary())  # void...
+    if dirichlet is None:  # create void boundary condition if not given one
+        dirichlet = FacetFunction('uint', msh, MARKER + 1)  # just in case: any value != MARK will do
+    bcP = DirichletBC(W.sub(0), Constant(value), dirichlet, MARKER)
     bcQ = DirichletBC(W.sub(1), z, GradientsBoundary())
     p, q = TrialFunctions(W)
     phi, psi = TestFunctions(W)

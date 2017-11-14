@@ -86,7 +86,8 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     elif qform == 'isotropic':
         # Isotropic density for steel at room temp.
         # E is in GPa. Is it ok to use these units? Setting it to 210e9
-        # breaks things (line searches don't end)
+        # breaks things (line searches don't end) because we need to scale
+        # elastic constants with h
         E, nu = 210.0, 0.3
         Q2, L2 = isotropic_form(E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 + 2 * nu))
     else:

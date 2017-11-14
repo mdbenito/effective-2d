@@ -39,6 +39,10 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     msh = Mesh(mesh_file)
 
+    MARKER = 1
+    subdomain = FacetFunction("uint", msh, 0)
+    recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=0)
+
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
     def noop(*args, **kwargs):
@@ -68,6 +72,8 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     disp = Function(P)
     disp.rename("disp", "displacement")
+
+    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
 
     file_name = make_filename('curl-dirichlet', init, qform, theta, mu)
     file = File(file_name)  # .vtu files will have the same prefix
@@ -100,7 +106,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     max_line_search_steps = 20
     step = 0
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
-    _hist = {'init': init, 'impl': 'curl', 'mu': mu, 'theta': theta, 'e_stop': e_stop,
+    _hist = {'init': init, 'impl': 'curl-dirichlet', 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'constraint': [],
              'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
              'symmetry': [], 'file_name': file_name}
@@ -125,7 +131,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     du, dv = dw.split()
 
     # Output initial condition
-    opd = compute_potential(v, V)
+    opd = compute_potential(v, V, subdomain, MARKER, 0.0)
     fax.assign(disp.sub(0), u.sub(0))
     fay.assign(disp.sub(1), u.sub(1))
     faz.assign(disp.sub(2), opd)
@@ -154,7 +160,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
              + 2 * mu * inner(curl(v_), curl(psi)) * dx(msh)
 
         debug("\tSolving...", end='')
-        solve(L == -dJ, dw, [])
+        solve(L == -dJ, dw, [bcW])
 
         du, dv = dw.split()
         # dw is never reassigned to a new object so it's ok
@@ -188,7 +194,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
         #### Write displacements to file
         debug("\tSaving... ", end='')
-        opd = compute_potential(v, V)
+        opd = compute_potential(v, V, subdomain, MARKER, 0.0)
         fax.assign(disp.sub(0), u.sub(0))
         fay.assign(disp.sub(1), u.sub(1))
         faz.assign(disp.sub(2), opd)

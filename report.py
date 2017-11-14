@@ -14,7 +14,6 @@ from math import floor, log10
 import binascii
 import os
 
-
 class PickleData(object):
     """ A simple interface around the dict of results with all runs.
 
@@ -87,6 +86,7 @@ class PickleData(object):
                  'title': 'results file:', 'filterable': False},
                 {'name': 'form_arguments', 'breakpoints': 'all',
                  'title': 'form arguments:', 'filterable': False},
+                {'name': 'mesh', 'title': 'Mesh file', 'breakpoints': 'all'},
                 {'name': 'select', 'title': '', 'filterable': False}]
         return json.dumps(cols)
 
@@ -110,7 +110,11 @@ class PickleData(object):
             row_data['time'] = "%02d:%02d:%02d" % (hh, mm, ss)
             row_data['form_name'] = row.get('Q2', {}).get('form_name', 'N/A')
             row_data['e_stop'] = int(log10(row.get('e_stop', 1))) - 1
-            row_data['plot'] = '<a class="plot_one" href="#single_plot_target" data-value="%s" onclick="show_one(this)">Plot</a>' % key
+            row_data['plot'] = '<a class="plot_one" href="#single_plot_target" ' \
+                               + 'data-value="%s" onclick="show_one(this)">Plot</a>' % key
+            mesh_file = row.get('mesh', '')
+            row_data['mesh'] = '<a class="plot_one" href="#single_plot_target" ' \
+                               + 'data-value="%s" onclick="show_mesh(this)">%s</a>' % (mesh_file, mesh_file)
             file_name = os.path.join(os.getcwd(), row.get('file_name', 'UNAVAILABLE'))
             row_data['results'] = '<a href="pvd://%s">%s</a>' % (file_name, os.path.basename(file_name))
             row_data['form_arguments'] = ", ".join("%s: %f" % (k, v) for k, v in
@@ -210,6 +214,20 @@ class Handler(BaseHTTPRequestHandler):
                         self._set_headers(400, 'Error: %s' % str(e))
             else:
                 self.send_error(400, 'Bad Request: run "%s" does not exist' % key)
+
+        elif re.match('/api/plot_mesh/', self.path) is not None:
+            mesh_file = self.path.split('/')[-1]
+            with io.BytesIO() as buf:
+                try:
+                    plots.plot_mesh(mesh_file)
+                    pl.savefig(buf, format='png')
+                    pl.close()
+                    buf.seek(0)
+                    self._image_headers()
+                    shutil.copyfileobj(buf, self.wfile)
+                except Exception as e:
+                    self._set_headers(400, 'Error: %s' % str(e))
+
         elif re.match('/api/plot_multiple/', self.path) is not None:
             ids = self.path.split('/')[-1].split(',')
 
@@ -224,6 +242,7 @@ class Handler(BaseHTTPRequestHandler):
                     shutil.copyfileobj(io.BytesIO(b64), self.wfile)
                 except Exception as e:
                     self.send_error(400, "Error: %s" % str(e))
+
         elif re.match('/api/delete/', self.path) is not None:
             ids = self.path.split('/')[-1].split(',')
             deleted = []

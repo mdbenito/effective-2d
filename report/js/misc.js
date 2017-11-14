@@ -73,12 +73,23 @@ function handle_plot_multiple(ft) {
 
 /**
  * Change the src of the lightshow div where single plots are drawn, so that it
- * is activated (by the :target property in CSS) and diplays the image.
+ * is activated (by the :target property in CSS) and it displays the image.
  * @param e
  */
 function show_one(e) {
     $('#single_plot').attr('src', '/api/plot_one/' + e.getAttribute('data-value'));
 }
+
+
+/**
+ * Change the src of the lightshow div where single plots are drawn, so that it
+ * is activated (by the :target property in CSS) and it displays the image.
+ * @param e
+ */
+function show_mesh(e) {
+    $('#single_plot').attr('src', '/api/plot_mesh/' + e.getAttribute('data-value'));
+}
+
 
 /** Creates a function to move the additional buttons into footable's header
  *

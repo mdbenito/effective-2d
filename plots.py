@@ -167,3 +167,10 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1):
     pl.title("Energy")
     pl.legend()
 
+
+def plot_mesh(mesh_file):
+    from dolfin import Mesh, plot
+    msh = Mesh(mesh_file)
+    numvertices = msh.geometry().num_vertices()
+    pl.figure(figsize=(12,12))
+    plot(msh, title=mesh_file + ", %d vertices" % numvertices)

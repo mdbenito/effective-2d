@@ -49,7 +49,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    file_name = make_filename('mixed', init, qform, theta, mu, create_dir=True)
+    file_name = make_filename('mixed', init, qform, theta, mu)
     file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)

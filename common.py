@@ -274,21 +274,30 @@ def filter_results(res: dict, init: str = None, qform: str = None, mesh_file: st
     return filter(which, res.items())
 
 
-def make_filename(model: str, init: str, q2name: str, theta: float, mu: float,
-               create_dir: bool = False) -> str:
+def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -> str:
     """ Creates a canonical file name and directory from model data.
-    Also creates the dir for convenience if asked to.
+    Also creates directories as necessary and appends incremental suffixes in case
+    of name collision.
+
+    Arguments
+    ---------
+        model: formulation used for the discretization (curl, mixed, ...)
+        init:  identifier of the initialisation data used
+        q2name: name of the quadratic form used
+        theta: value of the interpolating parameter
+        mu: penalty coefficient
     Returns
     -------
         Full path to PVD file.
     """
-    fname_prefix = "%s-%s-%09.4f-%05.2f-" % (init, q2name, theta, mu)
-    dir = os.path.join("output-" + model, fname_prefix.strip('-'))
-    file_name = os.path.join(dir, fname_prefix + ".pvd")
-    if create_dir:
+    suffix = ""
+    while True and suffix != 'z':  # FIXME? sloppy, what about weird locales? But who cares?
+        fname_prefix = "%s-%s-%09.4f-%05.2f-%s-" % (init, q2name, theta, mu, suffix)
+        dir = os.path.join("output-" + model, fname_prefix.strip('-'))
         try:
             os.makedirs(dir)
+            file_name = os.path.join(dir, fname_prefix + ".pvd")
+            return file_name
         except FileExistsError:
-            pass
-
-    return file_name
+            suffix = "b" if suffix == "" else chr(ord(suffix)+1)
+            continue

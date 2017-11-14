@@ -145,7 +145,11 @@ class Handler(BaseHTTPRequestHandler):
     def _image_headers(self):
         self.send_response(200)
         self.send_header('Pragma', 'public')
-        self.send_header('Cache-Control', 'max-age=1')
+        self.send_header("Pragma-directive", "no-cache")
+        self.send_header("Cache-directive", "no-cache")
+        self.send_header("Cache-control", "no-cache")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         # self.send_header('Expires', gmdate('D, d M Y H:i:s \G\M\T', time() + 86400));
         self.send_header('Content-Type', 'image/png')
         self.end_headers()

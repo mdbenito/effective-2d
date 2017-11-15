@@ -42,6 +42,21 @@ To use it just run
 python3 report.py
 ```
 
+## Plotting with ParaView
+
+After opening the `pvd` file, only two filters are necessary in the pipeline:
+ 1. **Calculator** to de-scale the displacements. Recall that in-plane
+  displacements scale with the square of the plate's thickness $h$ whereas
+  out-of-plane do linearly with it: $u_h = h^2 u, v_h = h v$
+  Physically meaningful values like $h = 0.01$ mean that one can't see anything
+  in the plot, so that in the end one needs e.g. $h = 0.3$. The expression for the
+  output is: 
+  ```
+  (0.3^2*disp_X)*iHat + (0.3^2*disp_Y)*jHat + (0.3*disp_Z)*kHat
+  ```
+ 2. **Warp by vector** to see the displacement.
+
+
 ## Contents
 
 * `descent-curl.py`: Gradient descent for a modified functional with only first

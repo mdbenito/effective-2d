@@ -169,8 +169,37 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1):
 
 
 def plot_mesh(mesh_file):
-    from dolfin import Mesh, plot
+        from dolfin import Mesh, plot
     msh = Mesh(mesh_file)
     numvertices = msh.geometry().num_vertices()
     pl.figure(figsize=(12,12))
     plot(msh, title=mesh_file + ", %d vertices" % numvertices)
+
+
+def plot_nodes_in_subdomain(subdomain, marker):
+    """ Draws a mesh and highlights the nodes in facets marked by `subdomain`.
+
+    Parameters
+    ---------
+        subdomain: a `FacetFunction` over a mesh.
+        marker: the value that facets of interest have.
+    """
+    try:
+        from dolfin import plot, Vertex, Facet
+    except ImportError:
+        import sys
+        sys.stderr.write("Could not import dolfin.")
+        return
+    msh = subdomain.mesh()
+    pl.figure(figsize=(10, 10))
+    plot(msh)
+
+    cc = []
+    for fidx in subdomain.where_equal(marker):
+        f = Facet(msh, fidx)
+        for vidx in f.entities(0):
+            v = Vertex(msh, vidx)
+            pt = v.point()
+            cc.extend([pt.x(), pt.y()])
+
+    pl.plot(cc[::2], cc[1::2], 'ro')

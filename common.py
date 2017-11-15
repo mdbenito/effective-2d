@@ -101,7 +101,7 @@ def compute_potential(z: Function, V: FunctionSpace, dirichlet:FacetFunction=Non
       $ \nabla p = q $ at the boundary
       $ p = 0 $ at the SubDomain 'zero'
 
-    Arguments
+    Parameters
     ---------
         :param z: gradient
         :param V: space for the potential
@@ -279,7 +279,7 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -
     Also creates directories as necessary and appends incremental suffixes in case
     of name collision.
 
-    Arguments
+    Parameters
     ---------
         model: formulation used for the discretization (curl, mixed, ...)
         init:  identifier of the initialisation data used

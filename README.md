@@ -6,7 +6,7 @@ Energy minimization schemes for the generalised von Kármán model in [1].
 
 [1] describes an effective two dimensional theory for multilayered plates in
 the von Kármán regime. The resulting functional is minimised here with vanilla
-gradient descent on $P_2$ spaces with penalty formulations.
+gradient descent on continuous Lagrange spaces with penalty formulations.
 
 The model is characterised by the interplay of both membrane and bending
 energy, with a parameter $\theta$ interpolating it from the Kirchhoff to the
@@ -21,7 +21,9 @@ We try to circumvent the use of Kirchhoff Discrete Triangles in the method
 of [2] without success. Some progress in the implementation of these
 elements for FEniCS is [here](https://bitbucket.org/mdbenito/hermite). Note
 however that this requires extensive changes and additions to FIAT and FFC, which
-are available in my forks but are quite hacky and not thoroughly tested.
+are available in (my)[https://bitbucket.org/mdbenito/fiat-fork] 
+(forks)[https://bitbucket.org/mdbenito/ffc-fork] but are quite hacky and not
+thoroughly tested.
 
 Results of the computations are stored both as VTK files in folders and as
 pickled objects containing relevant quantities gathered during the
@@ -31,8 +33,8 @@ sqlite or some document store / nosql thingy.
 ### Reports
 
 The script `report.py` implements a minimal web server to explore results in tabular
-form and easily combine them into plots. Not *very* useful, but it was fun and quick
-to do. The nice jQuery table is done with [FooTable](http://fooplugins.github.io/FooTable/),
+form and easily combine them into plots. It is not the _definitive_ dashboard, but it
+was fun and quick to do. The nice jQuery table is done with [FooTable](http://fooplugins.github.io/FooTable/),
 the fixed header with [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
 I also used some js and css from [codepen](https://codepen.io).
 
@@ -41,6 +43,10 @@ To use it just run
 ```shell
 python3 report.py
 ```
+
+It is possible to plot the evolution of the method in time for different runs
+side by side. Also, links to the ParaView files are displayed and should open, after
+properly configuring the system (e.g. adding mime types and handlers for xdg-open)
 
 ## Plotting with ParaView
 
@@ -81,7 +87,7 @@ After opening the `pvd` file, only two filters are necessary in the pipeline:
 * [tqdm](https://github.com/tqdm/tqdm) for the silly progress bars.
  I really shouldn't have made that necessary.
 
-## To do
+## Things to do that probably won't happen
 
 * Fix the issues with nbimporter and leave the models in the notebooks,
   instead of having copies (yuk!) in python scripts for parallel runs.

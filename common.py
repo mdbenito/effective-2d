@@ -7,7 +7,7 @@ import mshr
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
            "compute_potential", "save_results", "generate_mesh", "frobenius_form", "isotropic_form",
-           "filter_results", "make_filename"]
+           "filter_results", "make_filename", "recursively_intersect"]
 
 
 def make_initial_data_mixed(which: str, degree=2) -> Expression:
@@ -301,3 +301,42 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -
         except FileExistsError:
             suffix = "b" if suffix == "" else chr(ord(suffix)+1)
             continue
+
+
+def recursively_intersect(msh: Mesh, subdomain: FacetFunction,
+                          pt: Point, mark: int, recurr: int = 1):
+    """ Finds the cell(s) containing a point and fills a FacetFunction marking all their
+    facets for use with Dirichlet boundary conditions. It can recursively iterate through
+    neighbouring cells marking their facets as well.
+
+
+    Parameters
+    ----------
+    msh: The Mesh to use.
+    subdomain: The FacetFunction to return.
+    pt: a Point in the domain.
+    mark: the value that the FacetFunction will take on the facets found.
+    recurr: set to 0 to mark one cell. If `recurr` > 0, recursively process
+            neighbouring cells, up to `recurr` levels. If < 0, don't mark anything.
+
+    Returns
+    -------
+    Nothing. The output is in `subdomain`.
+    """
+
+    if recurr < 0:
+        return
+
+    ee = intersect(msh, pt)
+    for cidx in ee.intersected_cells():
+        c = Cell(msh, cidx)
+        for f in c.entities(1):
+            subdomain[int(f)] = mark
+        for vidx in c.entities(0):
+            v = Vertex(msh, vidx)
+            if recurr > 0:
+                recursively_intersect(msh, subdomain, v.point(), mark, recurr=recurr - 1)
+
+# msh = Mesh(mesh_file)
+# subdomain = FacetFunction("uint", msh, 0)
+# recursively_intersect(msh, subdomain, Point(0,0), 1)

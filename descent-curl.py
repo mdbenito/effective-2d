@@ -31,9 +31,28 @@ from time import time
 
 
 def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0.0,
+              dirichlet_size: int = -1, deg: int = 1,
               e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True, n=0):
     """
+    Parameters
+    ----------
+        init: Initial condition. One of 'ani_parab', ...
+        qform: Quadratic form to use: 'frobenius' or 'isotropic' (misnomer...)
+        mesh_file: name of (gzipped) xml file with the mesh data
+        theta:
+        mu:
+        deg: polynomial degree to use
+        dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
+                        > 0 to recursively enlarge the Dirichlet domain.
+        e_stop_mult: Multiplier for the stopping condition.
+        max_steps: Fallback maximum number of steps for gradient descent.
+        save_funs: Whether to store the last values of the solutions and updates
+                   in the returned dictionary (useful for plotting in a notebook but
+                   useless for pickling)
+        n: ...
     """
+    impl = 'curl-dirichlet' if dirichlet_size >= 0 else 'curl'
+    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
     qform = qform.lower()
 
@@ -41,9 +60,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     MARKER = 1
     subdomain = FacetFunction("uint", msh, 0)
-    recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=0)
-
-    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
+    recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
 
     def noop(*args, **kwargs):
         pass
@@ -56,16 +73,16 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     # debug = print
 
     # in plane displacements (IPD)
-    UE = VectorElement("Lagrange", msh.ufl_cell(), 2, dim=2)
+    UE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
     # Gradients of out of plane displacements (OPD)
-    VE = VectorElement("Lagrange", msh.ufl_cell(), 2, dim=2)
+    VE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
     W = FunctionSpace(msh, UE * VE)
     # will store out of plane displacements
-    V = FunctionSpace(msh, "Lagrange", 2)
+    V = FunctionSpace(msh, "Lagrange", deg)
 
     # We gather in-plane and out-of-plane displacements into one
     # Function for visualization with ParaView.
-    P = VectorFunctionSpace(msh, "Lagrange", 2, dim=3)
+    P = VectorFunctionSpace(msh, "Lagrange", deg, dim=3)
     fax = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
     fay = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
     faz = FunctionAssigner(P.sub(2), V)
@@ -75,7 +92,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
 
-    file_name = make_filename('curl-dirichlet', init, qform, theta, mu)
+    file_name = make_filename(impl, init, qform, theta, mu)
     file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)
@@ -91,6 +108,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
         Q2, L2 = frobenius_form()
     elif qform == 'isotropic':
         # Isotropic density for steel at room temp.
+        # http://scienceworld.wolfram.com/physics/LameConstants.html
         # E is in GPa. Is it ok to use these units? Setting it to 210e9
         # breaks things (line searches don't end) because we need to scale
         # elastic constants with h
@@ -106,8 +124,8 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     max_line_search_steps = 20
     step = 0
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
-    _hist = {'init': init, 'impl': 'curl-dirichlet', 'mesh': mesh_file,
-             'mu': mu, 'theta': theta, 'e_stop': e_stop,
+    _hist = {'init': init, 'impl': impl, 'deg': deg, 'mesh': mesh_file,
+             'dirichlet': dirichlet_size, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'constraint': [],
              'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
              'symmetry': [], 'file_name': file_name}

@@ -36,20 +36,21 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     """
     Parameters
     ----------
-        init: Initial condition. One of 'ani_parab', ...
+        init: Initial condition. One of 'zero', 'rot', 'parab', 'ani_parab',
+              'iso_compression', 'ani_compression', 'bartels'
         qform: Quadratic form to use: 'frobenius' or 'isotropic' (misnomer...)
         mesh_file: name of (gzipped) xml file with the mesh data
-        theta:
-        mu:
-        deg: polynomial degree to use
+        theta: coefficient for the nonlinear in-/out-of-plane mix of stresses
+        mu: penalty weight
         dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
                         > 0 to recursively enlarge the Dirichlet domain.
+        deg: polynomial degree to use
         e_stop_mult: Multiplier for the stopping condition.
         max_steps: Fallback maximum number of steps for gradient descent.
         save_funs: Whether to store the last values of the solutions and updates
                    in the returned dictionary (useful for plotting in a notebook but
                    useless for pickling)
-        n: ...
+        n: index of run in a parallel computation for the displaying of progress bars
     """
     impl = 'curl-dirichlet' if dirichlet_size >= 0 else 'curl'
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
@@ -109,7 +110,6 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     elif qform == 'isotropic':
         # Isotropic density for steel at room temp.
         # http://scienceworld.wolfram.com/physics/LameConstants.html
-        # E is in GPa. Is it ok to use these units? Setting it to 210e9
         # breaks things (line searches don't end) because we need to scale
         # elastic constants with h
         E, nu = 210.0, 0.3
@@ -119,6 +119,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     def eps(u):
         return (grad(u) + grad(u).T) / 2.0
+        # E is in GPa. Is it ok to use these units? Setting it to 210e9
 
     e_stop = msh.hmin() * e_stop_mult
     max_line_search_steps = 20
@@ -254,14 +255,16 @@ if __name__ == "__main__":
 
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(8.681, 8.690, 0.002)
+    theta_values = np.arange(10, 100, 40.0)
+    mu = 10.0
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
-                                                         theta=theta, mu=0.0,
-                                                         max_steps=10000, save_funs=False,
+                                                         theta=theta, mu=mu,
+                                                         dirichlet_size=0, deg=1,
+                                                         max_steps=15000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))
 

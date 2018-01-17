@@ -10,15 +10,36 @@ from common import *
 
 
 def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1.0,
+              dirichlet_size: int = -1, deg: int = 2,
               e_stop_mult: float = 1e-7, max_steps: int = 1000, save_funs: bool = True, n=0):
     """
+    Parameters
+    ----------
+        init: Initial condition. One of 'zero', 'parab', 'ani_parab'/
+        qform: Quadratic form to use: 'frobenius' or 'isotropic' (misnomer...)
+        mesh_file: name of (gzipped) xml file with the mesh data
+        theta: coefficient for the nonlinear in-/out-of-plane mix of stresses
+        mu: penalty weight
+        dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
+                        > 0 to recursively enlarge the Dirichlet domain.
+        deg: polynomial degree to use
+        e_stop_mult: Multiplier for the stopping condition.
+        max_steps: Fallback maximum number of steps for gradient descent.
+        save_funs: Whether to store the last values of the solutions and updates
+                   in the returned dictionary (useful for plotting in a notebook but
+                   useless for pickling)
+        n: index of run in a parallel computation for the displaying of progress bars
     """
+    impl = 'mixed-dirichlet' if dirichlet_size >= 0 else 'mixed'
+    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
     qform = qform.lower()
 
     msh = Mesh(mesh_file)
 
-    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
+    MARKER = 1
+    subdomain = FacetFunction("uint", msh, 0)
+    recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
 
     def noop(*args, **kwargs):
         pass
@@ -41,7 +62,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
 
     # We gather in-plane and out-of-plane displacements into one
     # Function for visualization with ParaView.
-    P = VectorFunctionSpace(msh, "Lagrange", 2, dim=3)
+    P = VectorFunctionSpace(msh, "Lagrange", deg, dim=3)
     fax = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
     fay = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
     faz = FunctionAssigner(P.sub(2), W.sub(1))
@@ -49,7 +70,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    file_name = make_filename('mixed', init, qform, theta, mu)
+    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
+
+    file_name = make_filename(impl, init, qform, theta, mu)
     file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)
@@ -65,6 +88,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
         Q2, L2 = frobenius_form()
     elif qform == 'isotropic':
         # Isotropic density for steel at room temp.
+        # http://scienceworld.wolfram.com/physics/LameConstants.html
         # E is in GPa. Is it ok to use these units? Setting it to 210e9
         # breaks things (line searches don't end)
         E, nu = 210.0, 0.3
@@ -79,14 +103,14 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
     max_line_search_steps = 20
     step = 0
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
-    _hist = {'init': init, 'impl': 'mixed', 'mesh': mesh_file,
+    _hist = {'init': init, 'impl': impl, 'mesh': mesh_file,
              'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dv': [], 'dz': [], 'constraint': [],
              'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
              'symmetry': [], 'file_name': file_name}
 
     B = Identity(2)
-    zero_energy = assemble((1. / 24) * inner(B, B) * dx(msh))
+    #zero_energy = assemble((1. / 24) * inner(B, B) * dx(msh))
 
     def energy(u, v, z, mu=mu):
         J = (theta / 2) * Q2(eps(u) + outer(grad(v), grad(v)) / 2) * dx(msh) \
@@ -136,7 +160,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
              + 2. * mu * inner(grad(v_) - z_, grad(psi) - eta) * dx(msh)
 
         debug("\tSolving...", end='')
-        solve(L == -dJ, dw, [])
+        solve(L == -dJ, dw, [bcW])
 
         du, dv, dz = dw.split()
         # dw is never reassigned to a new object so it should be ok
@@ -214,15 +238,19 @@ if __name__ == '__main__':
 
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(20, 24, 1.0, dtype=float)
+
+    theta_values = np.arange(20, 50, 10, dtype=float)
+    mu = 10.0
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'isotropic', mesh_file,
-                                                         theta=theta, mu=10.0,
-                                                         max_steps=20000, save_funs=False,
-                                                         e_stop_mult=1e-9, n=n)
+                                                         theta=theta, mu=mu,
+                                                         dirichlet_size=0, deg=2,
+                                                         max_steps=15000, save_funs=False,
+                                                         e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))
 
     save_results(new_res, results_file)
+

@@ -185,15 +185,21 @@ def name_run(r:dict) -> str:
                                            r['mu'], r['e_stop'], r['steps'])
 
 
-def save_results(results: list, results_file: str):
-    """ Takes a list of results dicts and pickles it.
-    Useful mainly for the output of Parallel jobs."""
-    # Load any previous results
+def load_results(results_file: str) -> dict:
+    """ Loads a pickle'ized dict of results and returns it. """
     try:
         with open(results_file, "rb") as fd:
-            old_results = pk.load(fd)
+            results = pk.load(fd)
+        return results
     except:
-        old_results = {}
+        return {}
+
+
+def save_results(results: dict, results_file: str):
+    """ Takes a dict of results dicts and pickles it.
+    Useful mainly for the output of Parallel jobs."""
+
+    old_results = load_results(results_file)
 
     # Merge new results in and prepare plots for summary view (TODO)
     new_results = {name_run(r): r for r in results}

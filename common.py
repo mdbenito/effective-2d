@@ -6,7 +6,8 @@ import mshr
 
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
-           "compute_potential", "save_results", "generate_mesh", "frobenius_form", "isotropic_form",
+           "compute_potential", "load_results", "save_results", "generate_mesh",
+           "frobenius_form", "isotropic_form",
            "filter_results", "make_filename", "recursively_intersect"]
 
 

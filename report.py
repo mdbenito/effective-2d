@@ -14,6 +14,7 @@ from math import floor, log10
 import binascii
 import os
 
+
 class PickleData(object):
     """ A simple interface around the dict of results with all runs.
 
@@ -61,7 +62,7 @@ class PickleData(object):
 
     def delete(self, item):
         """ Deletes one item from the store.
-        Remember that the data is not saved not disk unless save() is called.
+        Remember that the data is not saved to disk unless save() is called.
         """
         try:
             # from sys import stderr
@@ -103,6 +104,13 @@ class PickleData(object):
                         if col in ('impl', 'init', 'steps')}
             row_data['theta'] = round(row['theta'], 3)
             row_data['mu'] = round(row['mu'], 2)
+            # HACK: *sometimes* data are stored in numpy formats, which json.dumps()
+            # cannot handle. With item() we convert them to native python types.
+            try:
+                row_data['theta'] = row_data['theta'].item()
+                row_data['mu'] = row_data['mu'].item()
+            except AttributeError:
+                pass
             tt = max(0, row.get('time', 0))
             hh = floor(tt / 3600)
             mm = floor((tt - hh * 3600) / 60)
@@ -121,6 +129,7 @@ class PickleData(object):
                                                     row.get('Q2', {}).get('arguments', {}).items())
             row_data['select'] = toggle_button(key)
             ret.append(row_data)
+
         return json.dumps(ret)
 
 

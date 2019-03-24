@@ -255,16 +255,15 @@ if __name__ == "__main__":
 
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(10, 100, 40.0)
-    mu = 10.0
+    theta_values = [1.0] #np.arange(10,100,4)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(2, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
-                                                         theta=theta, mu=mu,
-                                                         dirichlet_size=0, deg=1,
-                                                         max_steps=15000, save_funs=False,
+                                                         theta=theta, mu=theta/10.0,
+                                                         dirichlet_size=-1, deg=1,
+                                                         max_steps=20000, save_funs=False,
                                                          e_stop_mult=1e-8, n=n)
                                       for n, theta in enumerate(theta_values))
 

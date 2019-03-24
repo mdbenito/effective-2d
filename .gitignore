@@ -4,6 +4,7 @@
 *.vtu
 *.h5
 *.pickle
+*.pk
 __pycache__/
 output*/
 \.idea/

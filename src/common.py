@@ -214,7 +214,7 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
     """ Generates a mesh, saves it to a file and returns the file name.
     Generation is only performed once.
      """
-    mesh_file = 'mesh-%dx%d-%s.xml.gz' % (m, n, kind)
+    mesh_file = '../meshes/mesh-%dx%d-%s.xml.gz' % (m, n, kind)
 
     if not os.path.isfile(mesh_file):
         if kind.lower() == 'circle':
@@ -301,7 +301,7 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -
     suffix = ""
     while True and suffix != 'z':  # FIXME? sloppy, what about weird locales? But who cares?
         fname_prefix = "%s-%s-%09.4f-%05.2f-%s-" % (init, q2name, theta, mu, suffix)
-        dir = os.path.join("output-" + model, fname_prefix.strip('-'))
+        dir = os.path.join("../output-" + model, fname_prefix.strip('-'))
         try:
             os.makedirs(dir)
             file_name = os.path.join(dir, fname_prefix + ".pvd")

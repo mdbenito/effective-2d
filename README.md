@@ -53,8 +53,10 @@ sqlite or some document store / nosql thingy.
 
 The script `report.py` implements a minimal web server to explore results in tabular
 form and easily combine them into plots. It is not the _definitive_ dashboard, but it
-was fun and quick to do. The nice jQuery table is done with [FooTable](http://fooplugins.github.io/FooTable/),
-the fixed header with [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
+was fun and quick to do. The nice jQuery table is done with
+ [FooTable](http://fooplugins.github.io/FooTable/),
+the fixed header with
+ [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
 I also used some js and css from [codepen](https://codepen.io).
 
 To use it just run

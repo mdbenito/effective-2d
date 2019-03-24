@@ -186,7 +186,7 @@ class Handler(BaseHTTPRequestHandler):
                 "woff2": "font/woff2",
                 "ico": "image/x-icon"}
             fname = self.path.split('?')[0]  # ignore url arguments
-            with open("report/" + fname.lstrip('/'), "rb") as fd:
+            with open("assets/" + fname.lstrip('/'), "rb") as fd:
                 #self.log_message("Serving file: %s" % fname)
                 extension = self.path[self.path.rfind('.')+1:]
                 self._set_headers(200, content=mimetypes.get(extension, "text/plain"))

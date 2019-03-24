@@ -1,0 +1,4 @@
+output-*
+src/__pycache__
+src/results-combined.*
+.git

@@ -1,0 +1,28 @@
+#!/bin/bash
+# MBD: November 2016
+
+if [ "$(whoami)" != "fenics" ]; then
+  echo "Run this as user fenics!"
+  exit 1
+fi
+
+## Source file with FEniCS configuration
+shopt -q login_shell
+if [ $? -ne 0 ]; then
+  source ${HOME}/fenics.env.conf
+fi
+
+## Run in the specified directory, handle special cases
+if [ -d "$1" ]; then
+  WORKING_DIR="$1"
+elif [ "$1" == "demo" ]; then
+  WORKING_DIR="${HOME}/local/share/dolfin/demo"
+else
+  WORKING_DIR="${HOME}/gvk"
+fi
+
+cd $WORKING_DIR
+
+# We have to leave this process running for docker exec not to exit immediately
+/usr/local/bin/jupyter-notebook --no-browser --ip=0.0.0.0
+

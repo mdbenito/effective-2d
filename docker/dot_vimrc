@@ -1,0 +1,18 @@
+colorscheme darkblue
+
+syntax on
+filetype plugin indent on
+set number
+
+" match and color tab characters 
+syntax match Tab /\t/
+hi Tab gui=underline guifg=green ctermbg=blue
+
+set softtabstop=4     " Columns in insert mode... ?
+set expandtab         " tab key insterts spaces 
+set tabstop=4         " one tab character is 4 columns wide
+set shiftwidth=4      " 4 of them
+
+set hlsearch                " highlight search results
+set incsearch               " incremental search
+

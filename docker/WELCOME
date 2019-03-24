@@ -1,0 +1,9 @@
+# Generalised von Kármán model using FEniCS
+
+This image provides a full-featured and optimized build of the stable
+release of FEniCS. Both python2 and python3 versions are available.
+
+The code for the von Kármán model is in ~/gvk
+
+This image also contains the standard FEniCS demo programs.
+

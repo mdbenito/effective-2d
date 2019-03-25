@@ -37,10 +37,12 @@ sqlite or some document store / nosql thingy.
   ```
   docker build -f docker/Dockerfile -t lvk:latest .
   ```
-  Then run:
+  Then run (this will share the output and source directories with the
+  container, so they persist after exiting the container).
   ```
-  docker run -v $(pwd)/output:/home/fenics/lvk/output -it \
-             --name lvk lvk fenics-notebook
+  docker run -v $(pwd)/output:/home/fenics/lvk/output \
+             -v $(pwd)/src:/home/fenics/lvk/src \
+             --rm -it --name lvk lvk fenics-notebook
   ```
 * `src`: Source files. Inside you will find:
   * `descent-curl.py`: Gradient descent for a modified functional with only first

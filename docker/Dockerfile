@@ -7,7 +7,7 @@ FROM quay.io/fenicsproject/stable:2017.1.0
 MAINTAINER Miguel de Benito Delgado <m.debenito.d@gmail.com>
 
 ENV home=/home/fenics
-ENV src=/home/fenics/gvk
+ENV src=/home/fenics/lvk
 
 ##############################################################################
 # Install necessary tools and python packages
@@ -44,7 +44,6 @@ COPY docker/dot_vimrc $home/.vimrc
 COPY docker/fenics-notebook /usr/local/bin/fenics-notebook
 COPY docker/WELCOME $home/WELCOME
 RUN mkdir -p $src/meshes
-COPY src $src
 
 ##############################################################################
 # Final setup, enable SSH, fix permissions

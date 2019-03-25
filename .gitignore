@@ -7,3 +7,4 @@
 *.pk
 __pycache__/
 \.idea/
+meshes/

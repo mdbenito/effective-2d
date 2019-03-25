@@ -30,24 +30,34 @@ pickled objects containing relevant quantities gathered during the
 computations. It is ugly and should probably be replaced by some database like
 sqlite or some document store / nosql thingy. 
 
-
 ## Contents
 
-* `descent-curl.py`: Gradient descent for a modified functional with only first
-  order derivatives and a penalty term enforcing the condition that 
-  $z = \nabla v$. The fact that the penalty term can be left out provides
-  some experimental evidence that minimisers of the new functional automatically
-  fulfill a vanishing curl constraint.
-* `descent-curl.ipynb`: Notebook accompanying `descent-curl.py` with some
-  exploratory plots.
-* `descent-mixed.py`: Mixed formulation for gradient descent.
-* `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py` with some
-  exploratory plots.
-* `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
-* `von Karman mixed.ipynb`: Implementation of the model in [2] using a
-  mixed model formulation. (Not working)
-* `report.py`: a server to explore results. See "Reports" below.
-
+* `docker`: `Dockerfile` to build an image and scripts to be installed in it.
+  To build the image, from the root of the project run:
+  ```
+  docker build -f docker/Dockerfile -t lvk:latest .
+  ```
+  Then run:
+  ```
+  docker run -v $(pwd)/output:/home/fenics/lvk/output -it \
+             --name lvk lvk fenics-notebook
+  ```
+* `src`: Source files. Inside you will find:
+  * `descent-curl.py`: Gradient descent for a modified functional with only first
+    order derivatives and a penalty term enforcing the condition that 
+    $z = \nabla v$. The fact that the penalty term can be left out provides
+    some experimental evidence that minimisers of the new functional automatically
+    fulfill a vanishing curl constraint.
+  * `descent-curl.ipynb`: Notebook accompanying `descent-curl.py` with some
+    exploratory plots.
+  * `descent-mixed.py`: Mixed formulation for gradient descent.
+  * `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py` with some
+    exploratory plots.
+  * `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
+  * `von Karman mixed.ipynb`: Implementation of the model in [2] using a
+    mixed model formulation. (Not working)
+  * `report.py`: a server to explore results. See "Reports" below.
+  
 
 ### Reports
 

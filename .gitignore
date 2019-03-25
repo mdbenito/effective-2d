@@ -6,5 +6,4 @@
 *.pickle
 *.pk
 __pycache__/
-output*/
 \.idea/

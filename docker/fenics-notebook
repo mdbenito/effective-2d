@@ -18,7 +18,7 @@ if [ -d "$1" ]; then
 elif [ "$1" == "demo" ]; then
   WORKING_DIR="${HOME}/local/share/dolfin/demo"
 else
-  WORKING_DIR="${HOME}/gvk"
+  WORKING_DIR="${HOME}/lvk"
 fi
 
 cd $WORKING_DIR

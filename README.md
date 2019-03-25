@@ -30,56 +30,75 @@ pickled objects containing relevant quantities gathered during the
 computations. It is ugly and should probably be replaced by some database like
 sqlite or some document store / nosql thingy. 
 
-## Contents
+## Requirements
 
-* `docker`: `Dockerfile` to build an image and scripts to be installed in it.
-  To build the image, from the root of the project run:
-  ```
-  docker build -f docker/Dockerfile -t lvk:latest .
-  ```
-  Then run (this will share the output and source directories with the
-  container, so they persist after exiting the container).
-  ```
-  docker run -v $(pwd)/output:/home/fenics/lvk/output \
-             -v $(pwd)/src:/home/fenics/lvk/src \
-             --rm -it --name lvk lvk fenics-notebook
-  ```
-* `src`: Source files. Inside you will find:
-  * `descent-curl.py`: Gradient descent for a modified functional with only first
-    order derivatives and a penalty term enforcing the condition that 
-    $z = \nabla v$. The fact that the penalty term can be left out provides
-    some experimental evidence that minimisers of the new functional automatically
-    fulfill a vanishing curl constraint.
-  * `descent-curl.ipynb`: Notebook accompanying `descent-curl.py` with some
-    exploratory plots.
-  * `descent-mixed.py`: Mixed formulation for gradient descent.
-  * `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py` with some
-    exploratory plots.
-  * `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
-  * `von Karman mixed.ipynb`: Implementation of the model in [2] using a
-    mixed model formulation. (Not working)
-  * `report.py`: a server to explore results. See "Reports" below.
-  
+All you need is a working docker installation to build the image and start
+the container. All dependencies are contained in the image. To build it,
+from the root of the project run:
+
+```
+docker build -f docker/Dockerfile -t lvk:latest .
+```
+
+## Usage
+
+To start a notebook server run (this will share the output and source
+directories with the container, so they persist after exiting it):
+```
+docker run -v $(pwd)/output:/home/fenics/lvk/output \
+           -v $(pwd)/src:/home/fenics/lvk/src \
+           -p 8888:8888 \
+           --rm -it --name lvk lvk fenics-notebook
+```
+
+The jupyter server will be accessible at http://localhost:8888
 
 ### Reports
 
-The script `report.py` implements a minimal web server to explore results in tabular
-form and easily combine them into plots. It is not the _definitive_ dashboard, but it
-was fun and quick to do. The nice jQuery table is done with
+The script `src/report.py` implements a minimal web server to explore results
+in tabular form and easily combine them into plots. It is not the _definitive_
+dashboard, but it was fun and quick to do. The nice jQuery table is done with
  [FooTable](http://fooplugins.github.io/FooTable/),
 the fixed header with
  [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
 I also used some js and css from [codepen](https://codepen.io).
 
-To use it just run
-
-```shell
-python3 report.py
-```
-
 It is possible to plot the evolution of the method in time for different runs
 side by side. Also, links to the ParaView files are displayed and should open, after
 properly configuring the system (e.g. adding mime types and handlers for xdg-open)
+
+
+To start the results server, run:
+```
+docker run -v $(pwd)/output:/home/fenics/lvk/output \
+           -v $(pwd)/src:/home/fenics/lvk/src \
+           -p 8080:8080 \
+           --rm -it --name lvk-report \
+           lvk python3 /home/fenics/lvk/src/report.py
+```
+Then go to http://localhost:8888.
+
+
+## Detailed contents
+
+* `docker`: `Dockerfile` to build an image and scripts to be installed in it.
+* `src`: Source files. Inside you will find:
+   * `descent-curl.py`: Gradient descent for a modified functional with only first
+     order derivatives and a penalty term enforcing the condition that 
+     $z = \nabla v$. The fact that the penalty term can be left out provides
+     some experimental evidence that minimisers of the new functional automatically
+     fulfill a vanishing curl constraint.
+   * `descent-curl.ipynb`: Notebook accompanying `descent-curl.py` with some
+     exploratory plots.
+   * `descent-mixed.py`: Mixed formulation for gradient descent.
+   * `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py` with some
+     exploratory plots.
+   * `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
+   * `von Karman mixed.ipynb`: Implementation of the model in [2] using a
+     mixed model formulation. (Not working)
+   * `report.py`: a server to explore results. See "Reports" below.
+ 
+  
 
 ## Plotting with ParaView
 

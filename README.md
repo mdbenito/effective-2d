@@ -76,7 +76,7 @@ docker run -v $(pwd)/output:/home/fenics/lvk/output \
            -v $(pwd)/src:/home/fenics/lvk/src \
            -p 8080:8080 \
            --rm -it --name lvk-report \
-           lvk report-server
+           lvk "report-server 0.0.0.0 8080"
 ```
 
 Then go to http://localhost:8888.

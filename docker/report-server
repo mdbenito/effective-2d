@@ -1,5 +1,5 @@
 #!/bin/bash
 
 cd /home/fenics/lvk/src
-python3 report.py
+python3 report.py $1 $2 
 

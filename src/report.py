@@ -297,10 +297,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(403, "Unhandled POST API call: '%s'" % self.path)
 
 
-def run(server_class=HTTPServer, handler_class=Handler, port=8080):
-    server_address = ('localhost', port)
-    httpd = server_class(server_address, handler_class)
-    print('Starting server at http://%s:%d' % (server_address))
+def run(server_class=HTTPServer, handler_class=Handler, ip='localhost', port=8080):
+    httpd = server_class((ip, port), handler_class)
+    print('Starting server at http://%s:%d' % (ip, port))
     httpd.serve_forever()
 
 
@@ -315,5 +314,7 @@ if __name__ == "__main__":
 
     if len(argv) == 2:
         run(port=int(argv[1]))
+    elif len(argv) == 3:
+        run(ip=argv[1], port=int(argv[2]))
     else:
         run()

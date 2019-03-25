@@ -8,6 +8,7 @@ MAINTAINER Miguel de Benito Delgado <m.debenito.d@gmail.com>
 
 ENV home=/home/fenics
 ENV src=/home/fenics/lvk
+ENV bin=/usr/local/bin
 
 ##############################################################################
 # Install necessary tools and python packages
@@ -41,7 +42,8 @@ COPY docker/git-prompt.sh $home/.git-prompt.sh
 COPY docker/dot_bashrc_extra /tmp/dot_bashrc_extra
 COPY docker/dot_inputrc $home/.inputrc
 COPY docker/dot_vimrc $home/.vimrc
-COPY docker/fenics-notebook /usr/local/bin/fenics-notebook
+COPY docker/fenics-notebook $bin/fenics-notebook
+COPY docker/report-server $bin/report-server
 COPY docker/WELCOME $home/WELCOME
 RUN mkdir -p $src/meshes
 
@@ -56,8 +58,9 @@ RUN /bin/cat /tmp/dot_bashrc_extra >> $home/.bashrc && \
     rm -f /tmp/dot_bashrc_extra && \
     systemctl enable ssh  && \
     mkdir -p $home/.ssh && \
-    chmod 744 /usr/local/bin/fenics-notebook && \
-    chown -R fenics.fenics $home/.* /usr/local/bin/fenics-notebook
+    chmod 744 $bin/fenics-notebook $bin/report-server && \
+    chown -R fenics.fenics $home/.* $bin/fenics-notebook \
+                           $bin/report-server
 #COPY id_rsa.pub $home/.ssh/authorized_keys
 
 WORKDIR $home

@@ -44,7 +44,8 @@ docker build -f docker/Dockerfile -t lvk:latest .
 
 To start a notebook server run (this will share the output and source
 directories with the container, so they persist after exiting it):
-```
+
+```shell
 docker run -v $(pwd)/output:/home/fenics/lvk/output \
            -v $(pwd)/src:/home/fenics/lvk/src \
            -p 8888:8888 \
@@ -69,13 +70,15 @@ properly configuring the system (e.g. adding mime types and handlers for xdg-ope
 
 
 To start the results server, run:
-```
+
+```shell
 docker run -v $(pwd)/output:/home/fenics/lvk/output \
            -v $(pwd)/src:/home/fenics/lvk/src \
            -p 8080:8080 \
            --rm -it --name lvk-report \
-           lvk python3 /home/fenics/lvk/src/report.py
+           lvk report-server
 ```
+
 Then go to http://localhost:8888.
 
 

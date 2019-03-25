@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cd /home/fenics/lvk/src
+ptyhon3 report.py
+

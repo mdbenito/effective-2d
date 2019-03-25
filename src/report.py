@@ -39,6 +39,7 @@ class PickleData(object):
             self._results = OrderedDict(sorted(results.items(), key=lambda x: x[1]['theta']))
         except FileNotFoundError:
             print("ERROR: results file '%s' not found" % self.results_file)
+            exit(1)
 
     def __getitem__(self, item_s):
         if isinstance(item_s, str):

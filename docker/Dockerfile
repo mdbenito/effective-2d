@@ -25,7 +25,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir --upgrade pip notebook ipykernel && \
     pip3 install --no-cache-dir jupyterthemes jupyter_contrib_nbextensions && \
-    pip3 install --no-cache-dir nbimporter autograd tqdm && \
+    pip3 install --no-cache-dir nbimporter autograd tqdm joblib && \
     jupyter contrib nbextension install --system && \
     jupyter nbextensions_configurator enable
 

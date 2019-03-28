@@ -45,8 +45,8 @@ def plots1(history:dict, _slice=slice(0,-1), running_mean_window=1):
     pl.plot(running(h['du'][_slice], running_mean_window))
     pl.title('$d_{t}u$, window: %d' % running_mean_window)
     pl.subplot(3,2,2)
-    pl.plot(running(h['dv'][_slice], running_mean_window))
-    pl.title('$d_{t}v$, window: %d' % running_mean_window)
+    pl.plot(running(h['dz'][_slice], running_mean_window))
+    pl.title('$d_{t}z$, window: %d' % running_mean_window)
     pl.subplot(3,2,3)
     pl.plot(running(np.log(h['alpha'][_slice]), running_mean_window))
     pl.title('$log\ \\alpha_t$, window: %d' % running_mean_window)
@@ -80,7 +80,7 @@ def plots2(history:dict):
     pl.subplot(2,2,3)
     plot(h['dtu'], title="$du_{\\theta}$ at last timestep, norm = %.2e" % norm(h['dtu']))
     pl.subplot(2,2,4)
-    plot(h['dtv'], title="$dv_{\\theta}$ at last timestep, norm = %.2e" % norm(h['dtv']))
+    plot(h['dtv'], title="$dz_{\\theta}$ at last timestep, norm = %.2e" % norm(h['dtz']))
 
 
 def plots3(run: dict, begin: float = 0.0, end: float = np.inf):
@@ -149,8 +149,8 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
     pl.legend()
     pl.subplot(3, 2, 2)
     for h in _runs:
-        pl.plot(running(h['dv'][_slice], running_mean_window), label='$\\theta = %.3f$' % h['theta'])
-    pl.title('$d_{t}v$, window: %d' % running_mean_window)
+        pl.plot(running(h['dz'][_slice], running_mean_window), label='$\\theta = %.3f$' % h['theta'])
+    pl.title('$d_{t}z$, window: %d' % running_mean_window)
     pl.legend()
     pl.subplot(3, 2, 3)
     for h in _runs:

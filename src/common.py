@@ -3,11 +3,12 @@ import numpy as np
 import os
 import pickle as pk
 import mshr
+import uuid
 
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
-           "compute_potential", "load_results", "save_results", "generate_mesh",
-           "frobenius_form", "isotropic_form",
+           "center_function", "compute_potential", "load_results", "save_results", "generate_mesh",
+           "eps", "symmetrise_gradient", "frobenius_form", "isotropic_form",
            "filter_results", "make_filename", "recursively_intersect"]
 
 
@@ -86,6 +87,79 @@ def circular_symmetry(disp: Function) -> float:
 
 circular_symmetry.pts = None
 
+
+def center_function(f: Function, dim: int = None, measure: float = None) -> None:
+    """ Subtracts the mean of a function in place. """
+    if not dim:
+        # This will fail for nested subspaces (e.g. product of spaces of dim>1)
+        dim = f.geometric_dimension()
+    integral = [assemble(f[i]*dx) for i in range(dim)]
+    #print("integral = %s" % integral)
+    
+    g = Function(f.function_space())
+    if not measure:
+        g.interpolate(Constant(tuple([1]*dim)))
+        measure = assemble(g[0]*dx)
+        #print("measure = %f" % measure)
+    
+    g.interpolate(Constant(tuple(integral[i]/measure for i in range(dim))))
+    # h = f.copy(deepcopy=True)
+    # h.vector()[:] -= g.vector()[:]
+    # return h
+    f.vector()[:] -= g.vector()[:]
+
+
+def agrad(u):
+    """ Returns the antisymmetric gradient of u. """
+    return (grad(u)-grad(u).T)/2
+
+
+def eps(u):
+    """ Returns the symmetric gradient of u. """
+    return (grad(u) + grad(u).T) / 2.0
+
+
+def symmetrise_gradient(f: Function, V: FunctionSpace, measure: float=None) -> None:
+    """ Modifies f:R^2 -> R^2 in place so that its antisymmetric gradient
+        integrates to zero.
+    """    
+    el = V.element()
+    assert el.value_rank() == 1 and el.value_dimension(0) == 2,\
+           "Can only handle functions with two components (dim was %d)" % \
+               el.value_rank() * el.value_dimension()
+    
+    Q = agrad(f)
+    q = assemble(Q[0,1]*dx)
+    if not measure:
+        g = Function(V)
+        g.interpolate(Constant((1,1)))
+        measure = assemble(g[0]*dx)
+        #print("measure = %f" % measure
+    
+    g = project(Expression(("2*A*x[1]", "A*x[0]"),A=2*q/measure, element=V.ufl_element()), V)
+    f.vector()[:] -= g.vector()[:]
+
+
+def test_symmetrise_gradient() -> bool:
+    """ TO DO: add more tests. """
+    msh = RectangleMesh(Point(0,0), Point(1,2), 12, 24)
+    V = VectorFunctionSpace(msh, "Lagrange", degree=1, dim=2)
+    ones = interpolate(Constant((1, 1)), V)
+
+    # \nabla_a f = [[0,1],[-1,0]]
+    for ex in [("x[0]+4*x[1]","2*x[0]+x[1]"),
+               ("6*x[1]*x[0]","2*x[1]*x[1]")]:
+        f = Expression(ex, element=V.ufl_element())
+        g = project(f, V)
+        symmetrise_gradient(g, V)
+        integrals = [assemble(agrad(g)[idx]*dx) for idx in [(0,0),(0,1),(1,0),(1,1)]]
+        if not np.allclose(integrals, 0, atol=1e-6):
+            print("Failed test for Expression: %s, %s" % ex)
+            print("Integrals: %s" % integrals)
+            return False
+        
+    return True
+    
 
 def compute_potential(z: Function, V: FunctionSpace, dirichlet:FacetFunction=None,
                       MARKER:int=1, value: float = 0.0) -> Function:
@@ -299,7 +373,8 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -
         Full path to PVD file.
     """
     suffix = ""
-    while True and suffix != 'z':  # FIXME? sloppy, what about weird locales? But who cares?
+    tries = 0
+    while True and tries < 0xFFFFF: # This is an ugly HACK...
         fname_prefix = "%s-%s-%09.4f-%05.2f-%s-" % (init, q2name, theta, mu, suffix)
         dir = os.path.join("../output/" + model, fname_prefix.strip('-'))
         try:
@@ -307,7 +382,7 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -
             file_name = os.path.join(dir, fname_prefix + ".pvd")
             return file_name
         except FileExistsError:
-            suffix = "b" if suffix == "" else chr(ord(suffix)+1)
+            suffix = uuid.uuid4().hex[:5]
             continue
 
 

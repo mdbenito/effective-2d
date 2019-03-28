@@ -30,9 +30,14 @@ from common import *
 from time import time
 
 
+def noop(*args, **kwargs):
+    pass
+
+
 def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0.0,
               dirichlet_size: int = -1, deg: int = 1,
-              e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True, n=0):
+              e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True,
+              debug=print, n=0):
     """
     Parameters
     ----------
@@ -52,59 +57,82 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
                    useless for pickling)
         n: index of run in a parallel computation for the displaying of progress bars
     """
-    impl = 'curl-dirichlet' if dirichlet_size >= 0 else 'curl'
+    set_log_level(ERROR)
+    
+    impl = 'curl-proj-dirichlet' if dirichlet_size >= 0 else 'curl-proj'
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
-    qform = qform.lower()
-
-    msh = Mesh(mesh_file)
-
     MARKER = 1
+    msh = Mesh(mesh_file)
     subdomain = FacetFunction("uint", msh, 0)
     recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
 
-    def noop(*args, **kwargs):
-        pass
-
-    def tout(s, **kwargs):
-        """ FIXME: Does not work as intended... """
-        t.write(s, end='')
-
-    debug = noop
-    # debug = print
-
-    # in plane displacements (IPD)
+    # In-plane displacements (IPD)
     UE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
-    # Gradients of out of plane displacements (OPD)
-    VE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
-    W = FunctionSpace(msh, UE * VE)
-    # will store out of plane displacements
+    U = FunctionSpace(msh, UE)
+
+    # Gradients of out-of-plane displacements (OPD)
+    ZE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
+    Z = FunctionSpace(msh, ZE)
+    
+    # Mixed function space u,z
+    W = FunctionSpace(msh, UE * ZE)
+    
+    # Removing the antisymmetric part of the gradient requires constructing
+    # functions in subspaces of W, which does not work because of dof orderings
+    # A solution is to collapse() the subspaces, but again dof ordering is not
+    # kept. In the end I'll just copy stuff around until I find something better.
+    # HACK HACK HACK, inefficient, this sucks
+    fau = FunctionAssigner(W.sub(0), U)
+    faz = FunctionAssigner(W.sub(1), Z)
+    rfau = FunctionAssigner(U, W.sub(0))
+    rfaz = FunctionAssigner(Z, W.sub(1))
+    
+    # will store out-of-plane displacements (potential of z)
     V = FunctionSpace(msh, "Lagrange", deg)
 
     # We gather in-plane and out-of-plane displacements into one
     # Function for visualization with ParaView.
     P = VectorFunctionSpace(msh, "Lagrange", deg, dim=3)
-    fax = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
-    fay = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
-    faz = FunctionAssigner(P.sub(2), V)
-
+    faux = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
+    fauy = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
+    fav = FunctionAssigner(P.sub(2), V)
     disp = Function(P)
     disp.rename("disp", "displacement")
 
-    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
-
+    qform = qform.lower()
     file_name = make_filename(impl, init, qform, theta, mu)
     file = File(file_name)  # .vtu files will have the same prefix
 
-    w = Function(W)
-    w_ = Function(W)
-    u, v = w.split()
-    u_, v_ = w_.split()
+    def save_displacements(u, z, step):
+        debug("\tSaving... ", end='')
+        v = compute_potential(z, V, subdomain, MARKER, 0.0)
+        faux.assign(disp.sub(0), u.sub(0))
+        fauy.assign(disp.sub(1), u.sub(1))
+        fav.assign(disp.sub(2), v)
+        file << (disp, float(step))        
+        debug("Done.")
+        
+    
+    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
 
+    # Solution at time t ("current step")
+    w = Function(W)
+    u, z = w.split()
+    # Solution at time t-1 ("previous step")
+    w_ = Function(W)
+    u_, z_ = w_.split()
+    # Gradient representative in the FE space
+    dw = Function(W)
+    du, dz = dw.split()
+    
+    # Initial condition
     w_init = make_initial_data_penalty(init)
     w.interpolate(w_init)
     w_.interpolate(w_init)
-
+    save_displacements(u, z, 0)  # Output it too
+    
+    # Setup forms and energy
     if qform == 'frobenius':
         Q2, L2 = frobenius_form()
     elif qform == 'isotropic':
@@ -117,55 +145,47 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     else:
         raise Exception("Unknown quadratic form name '%s'" % qform)
 
-    def eps(u):
-        return (grad(u) + grad(u).T) / 2.0
-        # E is in GPa. Is it ok to use these units? Setting it to 210e9
-
-    e_stop = msh.hmin() * e_stop_mult
-    max_line_search_steps = 20
-    step = 0
-    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
-    _hist = {'init': init, 'impl': impl, 'deg': deg, 'mesh': mesh_file,
-             'dirichlet': dirichlet_size, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
-             'J': [], 'alpha': [], 'du': [], 'dv': [], 'constraint': [],
-             'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
-             'symmetry': [], 'file_name': file_name}
-
     B = Identity(2)
     zero_energy = assemble((1. / 24) * inner(B, B) * dx(msh))
 
-    def energy(u, v, mu=mu):
-        J = (theta / 2.) * Q2(eps(u) + outer(v, v) / 2) * dx(msh) \
-            + (1. / 24) * Q2(grad(v) - B) * dx(msh) \
-            + mu * inner(curl(v), curl(v)) * dx(msh)
+    def energy(u, z, mu=mu):
+        J = (theta / 2.) * Q2(eps(u) + outer(z, z) / 2) * dx(msh) \
+            + (1. / 24) * Q2(grad(z) - B) * dx(msh) \
+            + mu * inner(curl(z), curl(z)) * dx(msh)
         return assemble(J)
-
-    # CAREFUL!! Picking the right scalar product here is essential
-    # Recall the issues with boundary values: integrate partially and only boundary terms survive...
-    dtu, dtv = TrialFunctions(W)
-    phi, psi = TestFunctions(W)
-    L = inner(dtu, phi) * dx + inner(grad(dtu), grad(phi)) * dx \
-        + inner(dtv, psi) * dx + inner(grad(dtv), grad(psi)) * dx
-
-    dw = Function(W)
-    du, dv = dw.split()
-
-    # Output initial condition
-    opd = compute_potential(v, V, subdomain, MARKER, 0.0)
-    fax.assign(disp.sub(0), u.sub(0))
-    fay.assign(disp.sub(1), u.sub(1))
-    faz.assign(disp.sub(2), opd)
-    file << (disp, float(step))
-
-    cur_energy = energy(u, v)
-    alpha = ndu = ndv = 1.0
-
+    
+    cur_energy = energy(u, z)
+    
+    ####### Set up gradient descent method and history
+    
+    e_stop = msh.hmin() * e_stop_mult
+    max_line_search_steps = 20
+    fail = False
+    step = 0
+    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
+    alpha = ndu = ndz = 1.0
+    
+    _hist = {'init': init, 'impl': impl, 'deg': deg, 'mesh': mesh_file,
+             'dirichlet': dirichlet_size, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
+             'J': [], 'alpha': [], 'du': [], 'dz': [], 'constraint': [],
+             'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
+             'symmetry': [], 'file_name': file_name}
+    
     debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
           % (theta, mu, e_stop, max_steps))
+    
+    # LHS for the gradient computation
+    # Careful!! Picking the right scalar product here is essential
+    # Recall the issues with boundary values: integrate partially 
+    # and only boundary terms survive...
+    dtu, dtz = TrialFunctions(W)
+    phi, psi = TestFunctions(W)
+    L = inner(dtu, phi) * dx + inner(grad(dtu), grad(phi)) * dx \
+        + inner(dtz, psi) * dx + inner(grad(dtz), grad(psi)) * dx
 
     begin = time()
-    while alpha * (ndu ** 2 + ndv ** 2) > e_stop and step < max_steps:
-        _curl = assemble(curl(v_) * dx)
+    while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:
+        _curl = assemble(curl(z_) * dx)
         _symmetry = circular_symmetry(disp)
         _hist['constraint'].append(_curl)
         _hist['symmetry'].append(_symmetry)
@@ -174,55 +194,65 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
         #### Gradient
         # for some reason I'm not able to use derivative(J, w_, dtw)
-        dJ = theta * L2(eps(u_) + outer(v_, v_) / 2,
-                        eps(phi) + sym(outer(v_, psi))) * dx(msh) \
-             + (1. / 12) * L2(grad(v_) - B, grad(psi)) * dx(msh) \
-             + 2 * mu * inner(curl(v_), curl(psi)) * dx(msh)
-
+        dJ = theta * L2(eps(u_) + outer(z_, z_) / 2,
+                        eps(phi) + sym(outer(z_, psi))) * dx(msh) \
+             + (1. / 12) * L2(grad(z_) - B, grad(psi)) * dx(msh) \
+             + 2 * mu * inner(curl(z_), curl(psi)) * dx(msh)
         debug("\tSolving...", end='')
+        # Since u_, v_ are given from the previous iteration, the
+        # problem is linear in phi,psi.
         solve(L == -dJ, dw, [bcW])
-
-        du, dv = dw.split()
-        # dw is never reassigned to a new object so it's ok
-        # to reuse du, dv without resplitting
+        
+        # dw is never reassigned to a new object so it should be ok
+        # to reuse du, dv without resplitting right?
+        du, dz = dw.split()
+        
         ndu = norm(du)
-        ndv = norm(dv)
+        ndz = norm(dz)
 
-        debug(" done with |du| = %.3f, |dv| = %.3f" % (ndu, ndv))
+        debug(" done with |du| = %.3f, |dz| = %.3f" % (ndu, ndz))
 
         #### Line search
         new_energy = 0
         debug("\tSearching... ", end='')
-        while True:
+        while not fail:
             w = project(w_ + alpha * dw, W)
-            u, v = w.split()
-            new_energy = energy(u, v)
-            if new_energy <= cur_energy - omega * alpha * (ndu ** 2 + ndv ** 2):
+            u, z = w.split()
+            nu = norm(u)
+            nz = norm(z)
+            debug(" new u,z with |u| = %.3f, |z| = %.3f, alpha=%.4f" % (nu, nz, alpha))
+            new_energy = energy(u, z)
+            if new_energy <= cur_energy - omega * alpha * (ndu ** 2 + ndz ** 2):
                 debug(" alpha = %.2e" % alpha)
                 _hist['J'].append(cur_energy)
                 _hist['alpha'].append(alpha)
                 _hist['du'].append(ndu)
-                _hist['dv'].append(ndv)
+                _hist['dz'].append(ndz)   # FIXME! use "dz" in the hist too
                 cur_energy = new_energy
                 alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
                 break
             if alpha < (1. / 2) ** max_line_search_steps:
-                raise Exception("Line search failed after %d steps" % max_line_search_steps)
+                fail = True
+                debug("Line search failed after %d steps" % max_line_search_steps)
             alpha /= 2.0  # Repeat with smaller alpha
-
         step += 1
-
-        #### Write displacements to file
-        debug("\tSaving... ", end='')
-        opd = compute_potential(v, V, subdomain, MARKER, 0.0)
-        fax.assign(disp.sub(0), u.sub(0))
-        fay.assign(disp.sub(1), u.sub(1))
-        faz.assign(disp.sub(2), opd)
-        file << (disp, float(step))
-        debug("Done.")
-
+        
+        # Project onto space of admissible displacements
+        u, z = Function(U), Function(Z)
+        rfau.assign(u, w.sub(0))
+        rfaz.assign(z, w.sub(1))
+        center_function(u, dim=2)
+        center_function(z, dim=2)
+        symmetrise_gradient(u, U)
+        fau.assign(w.sub(0), u)
+        faz.assign(w.sub(1), z)
+        
+        # HACK: go back to functions over subspaces
+        u, z = w.split()
         w_.vector()[:] = w.vector()
-        u_, v_ = w_.split()
+        u_, z_ = w_.split()
+        
+        save_displacements(u, z, step)
         t.update()
 
     _hist['time'] = time() - begin
@@ -235,9 +265,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
     if save_funs:
         _hist['disp'] = disp
         _hist['u'] = u
-        _hist['v'] = v
+        _hist['v'] = compute_potential(z, V, subdomain, MARKER, 0.0)
         _hist['dtu'] = du
-        _hist['dtv'] = dv
+        _hist['dtz'] = dz
     debug("Done after %d steps" % step)
 
     t.close()
@@ -251,20 +281,18 @@ if __name__ == "__main__":
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
-    set_log_level(ERROR)
-
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = [1.0] #np.arange(10,100,4)
+    theta_values = np.arange(60,80)
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
-    n_jobs = min(2, len(theta_values))
+    n_jobs = min(12, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
                                                          theta=theta, mu=theta/10.0,
                                                          dirichlet_size=-1, deg=1,
                                                          max_steps=20000, save_funs=False,
-                                                         e_stop_mult=1e-8, n=n)
+                                                         e_stop_mult=1e-8, debug=noop, n=n)
                                       for n, theta in enumerate(theta_values))
 
     save_results(new_res, results_file)

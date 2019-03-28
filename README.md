@@ -51,8 +51,11 @@ docker run -v $(pwd)/output:/home/fenics/lvk/output \
            -p 8888:8888 \
            --rm -it --name lvk lvk fenics-notebook
 ```
-
 The jupyter server will be accessible at http://localhost:8888
+Password and token authentication have been disabled for the server!
+
+Alternatively, you can run `sudo docker/start-notebook`, which basically
+does the above.
 
 ### Reports
 
@@ -79,7 +82,10 @@ docker run -v $(pwd)/output:/home/fenics/lvk/output \
            lvk "report-server 0.0.0.0 8080"
 ```
 
-Then go to http://localhost:8888.
+Then go to http://localhost:8080
+
+Alternatively, you can run `sudo docker/start-report`, which basically
+does the above.
 
 
 ## Detailed contents

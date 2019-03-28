@@ -3,25 +3,35 @@
 # # Problem definition
 # 
 # We wish to minimize
-# $$ I(u,v) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} \nabla v \otimes \nabla v|^{2} \mathrm{d}x
-#    + \frac{1}{24} \int_{\omega} |\nabla^2 v - \mathrm{Id}|^{2} \mathrm{d}x. $$
+#
+# $$ I(u,v) = \frac{\theta}{2} \int_{\omega} |\nabla_s u +
+#             \tfrac{1}{2} \nabla v \otimes \nabla v|^{2} \mathrm{d}x
+#             + \frac{1}{24} \int_{\omega} |\nabla^2 v -
+#             \mathrm{Id}|^{2} \mathrm{d}x. $$
 # 
-# Because we only have $C^0$ elements we set $z$ for $\nabla v$ and minimize instead
+# Because we only have $C^0$ elements we set $z$ for $\nabla v$ and
+# minimize instead
 # 
-# $$ J(u,z) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} z \otimes z|^{2} \mathrm{d}x 
-#           + \frac{1}{24} \int_{\omega} |\nabla z - \mathrm{Id}|^{2} \mathrm{d}x 
-#           + \mu \int_{\omega} |\mathrm{curl}\ z|^{2} \mathrm{d}x, $$
+# $$ J(u,z) = \frac{\theta}{2} \int_{\omega} |\nabla_s u +
+#             \tfrac{1}{2} z \otimes z|^{2} \mathrm{d}x + \frac{1}{24}
+#             \int_{\omega} |\nabla z - \mathrm{Id}|^{2} \mathrm{d}x +
+#             \mu \int_{\omega} |\mathrm{curl}\ z|^{2} \mathrm{d}x, $$
 # 
-# then recover the vertical displacements (up to a constant) by minimizing
+# then recover the vertical displacements (up to a constant) by
+# minimizing
 # 
-# $$ F(p,q) = \tfrac{1}{2} || \nabla p - q ||^2 + \tfrac{1}{2} || q - z ||^2. $$
+# $$ F(p,q) = \tfrac{1}{2} || \nabla p - q ||^2 + \tfrac{1}{2} || q -
+#             z ||^2. $$
 # 
 # This we do by solving the linear problem $D F = 0$.
 # 
-# Minimization of the energy functional $J$ is done via gradient descent and a line search. In plane displacements
-# and gradients of out of plane displacements form a mixed function space $U \times Z$. We also have another scalar
-# space $V$ where the potential of the out of plane gradients lives. The model is defined and solved in `run_model()`
-# below. Experiments can be easily run in parallel with `joblib`.
+# Minimization of the energy functional $J$ is done via gradient
+# descent and a line search. In plane displacements and gradients of
+# out of plane displacements form a mixed function space $U \times
+# Z$. We also have another scalar space $V$ where the potential of the
+# out of plane gradients lives. The model is defined and solved in
+# `run_model()` below. Experiments can be easily run in parallel with
+# `joblib`.
 
 from dolfin import *
 import numpy as np
@@ -34,10 +44,10 @@ def noop(*args, **kwargs):
     pass
 
 
-def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0.0,
-              dirichlet_size: int = -1, deg: int = 1,
-              e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True,
-              debug=print, n=0):
+def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
+              float = 0.0, dirichlet_size: int = -1, deg: int = 1,
+              e_stop_mult: float = 1e-5, max_steps: int = 400,
+              save_funs: bool = True, debug=print, n=0):
     """
     Parameters
     ----------
@@ -55,6 +65,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
         save_funs: Whether to store the last values of the solutions and updates
                    in the returned dictionary (useful for plotting in a notebook but
                    useless for pickling)
+        debug: set to noop or print
         n: index of run in a parallel computation for the displaying of progress bars
     """
     set_log_level(ERROR)
@@ -102,7 +113,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
 
     qform = qform.lower()
     file_name = make_filename(impl, init, qform, theta, mu)
-    file = File(file_name)  # .vtu files will have the same prefix
+    file = File(file_name, "compressed")  # .vtu files will have the same prefix
 
     def save_displacements(u, z, step):
         debug("\tSaving... ", end='')
@@ -283,15 +294,15 @@ if __name__ == "__main__":
 
     results_file = "results-combined.pickle"
     mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = np.arange(60,80)
+    theta_values = [10,20,30,40,50,80,90,100,110,120,130,140]
 
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(12, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
                                                          theta=theta, mu=theta/10.0,
-                                                         dirichlet_size=-1, deg=1,
-                                                         max_steps=20000, save_funs=False,
+                                                         dirichlet_size=0, deg=1,
+                                                         max_steps=10000, save_funs=False,
                                                          e_stop_mult=1e-8, debug=noop, n=n)
                                       for n, theta in enumerate(theta_values))
 

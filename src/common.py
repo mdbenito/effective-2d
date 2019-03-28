@@ -4,6 +4,7 @@ import os
 import pickle as pk
 import mshr
 import uuid
+from typing import List
 
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
@@ -270,8 +271,8 @@ def load_results(results_file: str) -> dict:
         return {}
 
 
-def save_results(results: dict, results_file: str):
-    """ Takes a dict of results dicts and pickles it.
+def save_results(results: List[dict], results_file: str):
+    """ Takes a list of results dicts and pickles it.
     Useful mainly for the output of Parallel jobs."""
 
     old_results = load_results(results_file)

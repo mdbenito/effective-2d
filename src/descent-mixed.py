@@ -8,6 +8,8 @@ from common import *
 #import nbimporter
 #from descent_mixed import run_model as mixed_model
 
+################################################################################
+# WARNING: THIS FILE IS OUTDATED. USE descent-curl instead.
 
 def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1.0,
               dirichlet_size: int = -1, deg: int = 2,

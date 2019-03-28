@@ -12,16 +12,13 @@ ENV bin=/usr/local/bin
 
 ##############################################################################
 # Install necessary tools and python packages
-#   - ssh for remote console access and (possibly) port forwarding
 #   - Pandoc for PDF export of notebooks (disabled, requires LaTeX)
 #   - vim for quick editing inside the container
 #   - nbimporter: import IPython notebooks as modules
 #   - autograd: Automatic differentiation with numpy support
 
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends \
-            ssh \
-            vim && \
+    apt-get install --yes --no-install-recommends vim && \
     rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir --upgrade pip notebook ipykernel && \
     pip3 install --no-cache-dir jupyterthemes jupyter_contrib_nbextensions && \
@@ -46,6 +43,8 @@ COPY docker/fenics-notebook $bin/fenics-notebook
 COPY docker/report-server $bin/report-server
 COPY docker/WELCOME $home/WELCOME
 RUN mkdir -p $src/meshes
+RUN mkdir $home/.jupyter
+COPY docker/jupyter_notebook_config.json $home/.jupyter/
 
 ##############################################################################
 # Final setup, enable SSH, fix permissions

@@ -1,4 +1,6 @@
 # coding: utf-8
+# Run with python3 -i descent-curl.py to get a prompt at the end
+# and on any exception / key interrupt
 
 # # Problem definition
 # 
@@ -46,8 +48,8 @@ def noop(*args, **kwargs):
 
 def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
               float = 0.0, dirichlet_size: int = -1, deg: int = 1,
-              e_stop_mult: float = 1e-5, max_steps: int = 400,
-              save_funs: bool = True, debug=print, n=0):
+              e_stop_mult: float = 1e-5, max_steps: int = 1000, skip:
+              int = 10, save_funs: bool = True, debug=print, n=0):
     """
     Parameters
     ----------
@@ -62,6 +64,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
         deg: polynomial degree to use
         e_stop_mult: Multiplier for the stopping condition.
         max_steps: Fallback maximum number of steps for gradient descent.
+        skip: save displacements every so many steps.
         save_funs: Whether to store the last values of the solutions and updates
                    in the returned dictionary (useful for plotting in a notebook but
                    useless for pickling)
@@ -238,7 +241,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
                 _hist['J'].append(cur_energy)
                 _hist['alpha'].append(alpha)
                 _hist['du'].append(ndu)
-                _hist['dz'].append(ndz)   # FIXME! use "dz" in the hist too
+                _hist['dz'].append(ndz)
                 cur_energy = new_energy
                 alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
                 break
@@ -262,8 +265,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
         u, z = w.split()
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
-        
-        save_displacements(u, z, step)
+
+        if step % skip == 0:
+            save_displacements(u, z, step)
         t.update()
 
     _hist['time'] = time() - begin
@@ -293,16 +297,19 @@ if __name__ == "__main__":
     parameters["form_compiler"]["cpp_optimize"] = True
 
     results_file = "results-combined.pickle"
-    mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = [10,20,30,40,50,80,90,100,110,120,130,140]
+    # mesh_file = generate_mesh('circle', 18, 18)
+    # theta_values = [150, 160, 170, 180, 190, 200, 300, 400, 500, 700, 900, 1100]
+    mesh_file = generate_mesh('circle', 36, 36)
+    theta_values = [200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000, 1500]
 
+    
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(12, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
                                                          theta=theta, mu=theta/10.0,
                                                          dirichlet_size=0, deg=1,
-                                                         max_steps=10000, save_funs=False,
+                                                         max_steps=15000, save_funs=False, skip=10,
                                                          e_stop_mult=1e-8, debug=noop, n=n)
                                       for n, theta in enumerate(theta_values))
 

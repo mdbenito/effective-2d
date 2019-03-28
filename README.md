@@ -148,6 +148,6 @@ software too.
 ## References
 
 [1] de Benito Delgado, *“Effective two-dimensional theories for
-multilayered plates.”*, 2018
+multilayered plates.”*, 2019
 
 [2] Bartels, *“Numerical Solution of a Föppl-von Karman Model.”*, 2016

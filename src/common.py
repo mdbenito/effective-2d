@@ -329,7 +329,7 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
     return isotropic, L2
 
 
-def filter_results(res: dict, init: str = None, impl: str = None, qform: str = None, # mesh_file: str = None,
+def filter_results(res: dict, init: str = None, impl: str = None, qform: str = None, mesh: str = None,
                 theta: tuple = None, mu: tuple = None, e_stop: tuple = None, steps: tuple = None) -> filter:
     """ Filters a results dictionary by multiple, inclusive, criteria.
 
@@ -350,8 +350,8 @@ def filter_results(res: dict, init: str = None, impl: str = None, qform: str = N
                and qform in (None, v['Q2']['form_name']) \
                and (theta is None or theta[0] <= v['theta'] < theta[1]) \
                and (mu is None or mu[0] <= v['mu'] < mu[1]) \
-               and (e_stop is None or e_stop[0] <= v['e_stop'] < e_stop[1])
-        # and mesh_file in (None, r['mesh_file'])
+               and (e_stop is None or e_stop[0] <= v['e_stop'] < e_stop[1]) \
+               and mesh in (None, v['mesh'])
         return cond
 
     return filter(which, res.items())

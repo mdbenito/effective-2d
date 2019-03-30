@@ -1,6 +1,4 @@
 # coding: utf-8
-# Run with python3 -i descent-curl.py to get a prompt at the end
-# and on any exception / key interrupt
 
 # # Problem definition
 # 
@@ -46,8 +44,8 @@ def noop(*args, **kwargs):
     pass
 
 
-def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
-              float = 0.0, dirichlet_size: int = -1, deg: int = 1,
+def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
+              float = 1.0, dirichlet_size: int = -1, deg: int = 1,
               e_stop_mult: float = 1e-5, max_steps: int = 1000, skip:
               int = 10, save_funs: bool = True, debug=print, n=0):
     """
@@ -58,7 +56,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
         qform: Quadratic form to use: 'frobenius' or 'isotropic' (misnomer...)
         mesh_file: name of (gzipped) xml file with the mesh data
         theta: coefficient for the nonlinear in-/out-of-plane mix of stresses
-        mu: penalty weight
+        mu_scale: compute penalty weight as mu_scale / msh.hmin()
         dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
                         > 0 to recursively enlarge the Dirichlet domain.
         deg: polynomial degree to use
@@ -80,7 +78,8 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
     msh = Mesh(mesh_file)
     subdomain = FacetFunction("uint", msh, 0)
     recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
-
+    mu = mu_scale / msh.hmin()
+    
     # In-plane displacements (IPD)
     UE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
     U = FunctionSpace(msh, UE)

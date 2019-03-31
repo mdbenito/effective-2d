@@ -7,9 +7,11 @@ import uuid
 from typing import List
 
 
-__all__ = ["make_initial_data_mixed", "make_initial_data_penalty", "circular_symmetry",
-           "center_function", "compute_potential", "load_results", "save_results", "generate_mesh",
-           "eps", "symmetrise_gradient", "frobenius_form", "isotropic_form",
+__all__ = ["make_initial_data_mixed", "make_initial_data_penalty",
+           "circular_symmetry", "rectangular_symmetry",
+           "center_function", "compute_potential", "load_results",
+           "save_results", "generate_mesh", "eps",
+           "symmetrise_gradient", "frobenius_form", "isotropic_form",
            "filter_results", "make_filename", "recursively_intersect"]
 
 
@@ -69,25 +71,51 @@ def make_initial_data_penalty(which: str, degree=2) -> Expression:
 
 
 def circular_symmetry(disp: Function) -> float:
-    """ Computes the quotient of the lenghts of the principal axes of an ellipse
-    This assumes that the domain before the deformation is a circle.
+    """ Computes the quotient of the lenghts of the principal axes of an
+    ellipse This assumes that the domain before the deformation is a
+    circle.
 
-    FIXME: I should be taking more points. Also, it would be best to compute
-    the intersection of rays with the mesh, instead of this hackish min/max stuff.
+    FIXME: I should be taking more points. Also, it would be best to
+    compute the intersection of rays with the mesh, instead of this
+    hackish min/max stuff.
     """
     if circular_symmetry.pts is None:
         cc = disp.function_space().mesh().coordinates()
-        xmin = cc[:,0].argmin()
-        xmax = cc[:,0].argmax()
-        ymin = cc[:,1].argmin()
-        ymax = cc[:,1].argmax()
-        circular_symmetry.pts = [Point(cc[xmax]), Point(cc[ymax]), Point(cc[xmin]), Point(cc[ymin])]
+        ixmin = cc[:,0].argmin()
+        ixmax = cc[:,0].argmax()
+        iymin = cc[:,1].argmin()
+        iymax = cc[:,1].argmax()
+        circular_symmetry.pts = [Point(cc[ixmax]), Point(cc[iymax]),
+                                 Point(cc[ixmin]), Point(cc[iymin])]
     newpts = [p.array()+disp(p) for p in circular_symmetry.pts]
     a = np.linalg.norm(newpts[0] - newpts[2])
     b = np.linalg.norm(newpts[1] - newpts[3])
     return a / b
 
 circular_symmetry.pts = None
+
+
+def rectangular_symmetry(disp: Function) -> float:
+    """ Computes the quotient of the lengths of the diagonals of the
+        square mesh.
+
+        HACK: should have just one symmetry function. Also this relies
+        on the corners of the mesh being valid points.
+    """
+    if rectangular_symmetry.pts is None:
+        cc = disp.function_space().mesh().coordinates()
+        xmin = cc[:,0].min()
+        xmax = cc[:,0].max()
+        ymin = cc[:,1].min()
+        ymax = cc[:,1].max()
+        rectangular_symmetry.pts = [Point(xmin, ymin), Point(xmax, ymin),
+                                    Point(xmax, ymax), Point(xmin, ymax)]
+    newpts = [p.array()+disp(p) for p in rectangular_symmetry.pts]
+    a = np.linalg.norm(newpts[0] - newpts[2])
+    b = np.linalg.norm(newpts[1] - newpts[3])
+    return a / b
+    
+rectangular_symmetry.pts = None
 
 
 def center_function(f: Function, dim: int = None, measure: float = None) -> None:

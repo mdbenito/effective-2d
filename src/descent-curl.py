@@ -315,20 +315,18 @@ if __name__ == "__main__":
     parameters["form_compiler"]["cpp_optimize"] = True
 
     results_file = "results-combined.pickle"
-    # mesh_file = generate_mesh('circle', 18, 18)
-    # theta_values = [150, 160, 170, 180, 190, 200, 300, 400, 500, 700, 900, 1100]
-    mesh_file = generate_mesh('circle', 36, 36)
-    theta_values = [200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000, 1500]
-
+    
+    mesh_file = generate_mesh('circle', 12, 12)
+    theta_values = [0.1, 0.5, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80,
+                    90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
+                    250, 300, 400, 500]
     
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(12, len(theta_values))
-
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
-                                                         theta=theta, mu=theta/10.0,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('zero', 'frobenius', mesh_file,
+                                                         theta=theta, mu_scale=0.1,
                                                          dirichlet_size=0, deg=1,
-                                                         max_steps=15000, save_funs=False, skip=10,
+                                                         max_steps=8000, save_funs=False, skip=8,
                                                          e_stop_mult=1e-8, debug=noop, n=n)
                                       for n, theta in enumerate(theta_values))
-
     save_results(new_res, results_file)

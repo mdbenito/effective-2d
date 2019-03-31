@@ -191,7 +191,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
              'dirichlet': dirichlet_size, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
              'J': [], 'alpha': [], 'du': [], 'dz': [], 'constraint': [],
              'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
-             'symmetry': [], 'file_name': file_name}
+             'Kxx': [], 'Kxy': [], 'Kyy': [],'symmetry': [], 'file_name': file_name}
     
     debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
           % (theta, mu, e_stop, max_steps))
@@ -206,9 +206,15 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
         + inner(dtz, psi) * dx + inner(grad(dtz), grad(psi)) * dx
 
     begin = time()
+    domain_area = assemble(1*dx(msh))
     while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:
         _curl = assemble(curl(z_) * dx)
-        _symmetry = circular_symmetry(disp)
+        K = project(sym(grad(z_)), TensorFunctionSpace(msh, 'DG', 0))
+        _hist['Kxx'].append(assemble(K[0,0]*dx)/domain_area)
+        _hist['Kxy'].append(assemble(K[0,1]*dx)/domain_area)
+        _hist['Kyy'].append(assemble(K[1,1]*dx)/domain_area)
+        
+        _symmetry = symmetry(disp)
         _hist['constraint'].append(_curl)
         _hist['symmetry'].append(_symmetry)
         debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"

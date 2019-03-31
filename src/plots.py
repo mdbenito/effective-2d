@@ -2,7 +2,7 @@ from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as pl
 
-__all__ = ["plots1", "plots2", "plots3", "plots4"]
+__all__ = ["plots1", "plots2", "plots3", "plots4", "plot_K"]
 
 
 def running(x, N=5):
@@ -175,6 +175,29 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
         pl.plot(h['J'][_slice], label='$\\theta = %.3f$' % h['theta'])
     pl.title("Energy")
     pl.legend()
+
+
+def plot_K(history:dict, _slice=slice(0,-1), running_mean_window=1):
+    h = history
+    if running_mean_window is None or _slice is None:
+        beg, running_mean_window = estimate_win_size([h['steps']])
+        _slice = slice(beg, -1)
+
+    pl.figure(figsize=(18,12), )
+    pl.suptitle("'%s', $\\theta = %.3e$, $\mu = %.2e$, $\\epsilon = %.2e$"
+                % (h['init'], h['theta'], h['mu'], h['e_stop']))
+    pl.subplot(2,2,1)
+    pl.plot(running(h['Kxx'][_slice], running_mean_window))
+    pl.title('$K_{xx}$, window: %d' % running_mean_window)
+    pl.subplot(2,2,2)
+    pl.plot(running(h['Kxy'][_slice], running_mean_window))
+    pl.title('$K_{xy}$, window: %d' % running_mean_window)
+    pl.subplot(2,2,3)
+    pl.plot(running(h['Kyy'][_slice], running_mean_window))
+    pl.title('$K_{yy}$, window: %d' % running_mean_window)
+    pl.subplot(2,2,4)
+    pl.plot(h['symmetry'][_slice])
+    pl.title("symmetry")
 
 
 def plot_mesh(mesh_file:str) -> None:

@@ -43,7 +43,8 @@ def make_initial_data_penalty(which: str, degree=2) -> Expression:
                     'parab': lambda x: [0.0, 0.0, x[0], x[1]],
                     'ani_parab': lambda x: [0.0, 0.0, 0.3 * x[0], x[1]],
                     'iso_compression': lambda x: [-0.2 * x[0], -0.2 * x[1], 0.0, 0.0],
-                    'ani_compression': lambda x: [-0.4 * x[0], -0.1 * x[1], 0.0, 0.0],
+                    # Compress and raise along x[0]
+                    'ani_compression': lambda x: [-0.05 * x[0], 0.0, 0.05, 0.0],
                     'bartels': lambda x: [0.0, -x[1] / 10.0,
                                           x[0] * (1 - x[0]) * (1 - 2 * x[0]) * sin(4 * DOLFIN_PI * x[1]),
                                           2 * DOLFIN_PI * x[0] ** 2 * (1 - x[0]) ** 2 * cos(4 * DOLFIN_PI * x[1])]}

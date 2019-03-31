@@ -270,17 +270,17 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
         step += 1
         
         # Project onto space of admissible displacements
-        u, z = Function(U), Function(Z)
-        rfau.assign(u, w.sub(0))
-        rfaz.assign(z, w.sub(1))
-        #center_function(u, dim=2)
-        #center_function(z, dim=2)
-        symmetrise_gradient(u, U)
-        fau.assign(w.sub(0), u)
-        faz.assign(w.sub(1), z)
-        
+        # u, z = Function(U), Function(Z)
+        # rfau.assign(u, w.sub(0))
+        # rfaz.assign(z, w.sub(1))
+        # center_function(u, dim=2)
+        # center_function(z, dim=2)
+        # symmetrise_gradient(u, U)
+        # fau.assign(w.sub(0), u)
+        # faz.assign(w.sub(1), z)        
         # HACK: go back to functions over subspaces
-        u, z = w.split()
+        # u, z = w.split()
+
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
 

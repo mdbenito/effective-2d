@@ -99,6 +99,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
     
     # Mixed function space u,z
     W = FunctionSpace(msh, UE * ZE)
+
+    # For the curvature computation
+    T = TensorFunctionSpace(msh, 'DG', 0)
     
     # Removing the antisymmetric part of the gradient requires constructing
     # functions in subspaces of W, which does not work because of dof orderings
@@ -207,9 +210,10 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
 
     begin = time()
     domain_area = assemble(1*dx(msh))
+    
     while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:
         _curl = assemble(curl(z_) * dx)
-        K = project(sym(grad(z_)), TensorFunctionSpace(msh, 'DG', 0))
+        K = project(sym(grad(z_)), T)
         _hist['Kxx'].append(assemble(K[0,0]*dx)/domain_area)
         _hist['Kxy'].append(assemble(K[0,1]*dx)/domain_area)
         _hist['Kyy'].append(assemble(K[1,1]*dx)/domain_area)

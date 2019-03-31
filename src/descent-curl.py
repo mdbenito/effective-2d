@@ -79,6 +79,15 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
     subdomain = FacetFunction("uint", msh, 0)
     recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
     mu = mu_scale / msh.hmin()
+
+    # FIXME: generalise symmetry calculations to avoid this hack
+    # Even better, use curvature instead
+    if mesh_file.lower().find('circle') >= 0:
+        symmetry = circular_symmetry
+    elif mesh_file.lower().find('rectangle') >= 0:
+        symmetry = rectangular_symmetry
+    else:
+        raise ValueError("Unsupported mesh geometry for symmetry calculation")
     
     # In-plane displacements (IPD)
     UE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)

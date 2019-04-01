@@ -223,7 +223,8 @@ class Handler(BaseHTTPRequestHandler):
                     except Exception as e:
                         self._set_headers(400, 'Error: %s' % str(e))
             else:
-                self.send_error(400, 'Bad Request: run "%s" does not exist' % key)
+                self.send_error(400, 'Bad Request: run "%s" does not exist' %
+                                     key)
 
         elif re.match('/api/plot_mesh/', self.path) is not None:
             mesh_file = self.path.split('/')[-1]
@@ -256,25 +257,27 @@ class Handler(BaseHTTPRequestHandler):
         elif re.match('/api/delete/', self.path) is not None:
             ids = self.path.split('/')[-1].split(',')
             deleted = []
-            files_deleted = 0
             for id in ids:
+                files_deleted = 0
                 dir, file = os.path.split(data[id].get('file_name', ''))
                 try:
-                    # Be extra careful: a "safe" path to delete is not absolute, not .,
-                    # and contains only vtu and pvd files
-                    if not os.path.isabs(dir) and dir != "" and dir[0] != ".":
+                    # Be extra careful: a "safe" path to delete is not
+                    # absolute and contains only vtu and pvd files
+                    if not os.path.isabs(dir) and dir != "":
                         dir = os.path.join(os.getcwd(), dir)
                         for f in os.listdir(dir):
                             _, ext = os.path.splitext(f)
                             if ext in ('.pvd', '.vtu'):
                                 os.unlink(os.path.join(dir, f))
                                 files_deleted += 1
-                                # self.log_message("unlink: " + os.path.join(dir, f))
-                        os.rmdir(dir)
+                                # self.log_message("unlink: %s" % os.path.join(dir, f))
+                        if files_deleted > 0:
+                            os.rmdir(dir)
                     tmp = data.delete(id)
                     deleted.append(tmp)
                     if tmp:
-                        self.log_message("Deleted item '%s' and %d files" % (id, files_deleted))
+                        self.log_message("Deleted item '%s' and %d files" %
+                                         (id, files_deleted))
                 except Exception as e:
                     self.log_error("%s [%s, %s]" % (str(e), dir, file))
                     # TODO: report errors?

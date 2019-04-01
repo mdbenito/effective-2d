@@ -10,8 +10,8 @@
   position: fixed;
   z-index: 9999;
   top: 38vh;
-  left: calc(50% - 150px);
-  width: 300px;
+  left: 25%;
+  width: 50%;
   background: white;
   border-radius: 4px;
   padding: 20px;

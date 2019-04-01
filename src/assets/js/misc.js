@@ -43,7 +43,7 @@ function handle_delete(ft) {
     return function(e) {
         e.preventDefault();
         var active = $('.tgl:checked').map(function () { return this.id; }).get();
-        $.alertable.confirm('Delete: <br/>' + active.join(',<br/>'), {html: true}).then(function() {
+        $.alertable.confirm('Delete: <br/><small>' + active.join(',<br/>')+ '</small>', {html: true}).then(function() {
             $.get("/api/delete/" + active.join()).done(reload_data(ft, $(e.currentTarget)));
         }, function(e) {
             console.log('Deletion canceled');

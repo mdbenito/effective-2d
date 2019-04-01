@@ -44,10 +44,11 @@ def noop(*args, **kwargs):
     pass
 
 
-def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
-              float = 1.0, dirichlet_size: int = -1, deg: int = 1,
-              e_stop_mult: float = 1e-5, max_steps: int = 1000, skip:
-              int = 10, save_funs: bool = True, debug=print, n=0):
+def run_model(init: str, qform: str, mesh_file: str, theta: float,
+              mu_scale: float = 1.0, dirichlet_size: int = -1, deg:
+              int = 1, projection: bool = False, e_stop_mult: float =
+              1e-5, max_steps: int = 1000, skip: int = 10, save_funs:
+              bool = True, debug=print, n=0):
     """
     Parameters
     ----------
@@ -60,6 +61,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
         dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
                         > 0 to recursively enlarge the Dirichlet domain.
         deg: polynomial degree to use
+        projection: set to True to project gradient updates onto the space of
+                 functions with vanishing mean and vanishing mean anti-symmetric
+                 gradient.
         e_stop_mult: Multiplier for the stopping condition.
         max_steps: Fallback maximum number of steps for gradient descent.
         skip: save displacements every so many steps.
@@ -102,16 +106,17 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
 
     # For the curvature computation
     T = TensorFunctionSpace(msh, 'DG', 0)
-    
-    # Removing the antisymmetric part of the gradient requires constructing
-    # functions in subspaces of W, which does not work because of dof orderings
-    # A solution is to collapse() the subspaces, but again dof ordering is not
-    # kept. In the end I'll just copy stuff around until I find something better.
-    # HACK HACK HACK, inefficient, this sucks
-    fau = FunctionAssigner(W.sub(0), U)
-    faz = FunctionAssigner(W.sub(1), Z)
-    rfau = FunctionAssigner(U, W.sub(0))
-    rfaz = FunctionAssigner(Z, W.sub(1))
+
+    if projection:
+        # Removing the antisymmetric part of the gradient requires constructing
+        # functions in subspaces of W, which does not work because of dof orderings
+        # A solution is to collapse() the subspaces, but again dof ordering is not
+        # kept. In the end I'll just copy stuff around until I find something better.
+        # HACK HACK HACK, inefficient, this sucks
+        fa_u2w = FunctionAssigner(W.sub(0), U)
+        fa_z2w = FunctionAssigner(W.sub(1), Z)
+        fa_w2u = FunctionAssigner(U, W.sub(0))
+        fa_w2z = FunctionAssigner(Z, W.sub(1))
     
     # will store out-of-plane displacements (potential of z)
     V = FunctionSpace(msh, "Lagrange", deg)
@@ -119,9 +124,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
     # We gather in-plane and out-of-plane displacements into one
     # Function for visualization with ParaView.
     P = VectorFunctionSpace(msh, "Lagrange", deg, dim=3)
-    faux = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
-    fauy = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
-    fav = FunctionAssigner(P.sub(2), V)
+    fa_w2x = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
+    fa_w2y = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
+    fa_v2z = FunctionAssigner(P.sub(2), V)
     disp = Function(P)
     disp.rename("disp", "displacement")
 
@@ -132,9 +137,9 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
     def save_displacements(u, z, step):
         debug("\tSaving... ", end='')
         v = compute_potential(z, V, subdomain, MARKER, 0.0)
-        faux.assign(disp.sub(0), u.sub(0))
-        fauy.assign(disp.sub(1), u.sub(1))
-        fav.assign(disp.sub(2), v)
+        fa_w2x.assign(disp.sub(0), u.sub(0))
+        fa_w2y.assign(disp.sub(1), u.sub(1))
+        fa_v2z.assign(disp.sub(2), v)
         file << (disp, float(step))        
         debug("Done.")
         
@@ -191,10 +196,11 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
     alpha = ndu = ndz = 1.0
     
     _hist = {'init': init, 'impl': impl, 'deg': deg, 'mesh': mesh_file,
-             'dirichlet': dirichlet_size, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
+             'projection': projection, 'dirichlet': dirichlet_size, 'mu': mu,
+             'theta': theta, 'e_stop': e_stop, 'file_name': file_name,
              'J': [], 'alpha': [], 'du': [], 'dz': [], 'constraint': [],
              'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
-             'Kxx': [], 'Kxy': [], 'Kyy': [],'symmetry': [], 'file_name': file_name}
+             'Kxx': [], 'Kxy': [], 'Kyy': [],'symmetry': []}
     
     debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
           % (theta, mu, e_stop, max_steps))
@@ -231,7 +237,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
              + (1. / 12) * L2(grad(z_) - B, grad(psi)) * dx(msh) \
              + 2 * mu * inner(curl(z_), curl(psi)) * dx(msh)
         debug("\tSolving...", end='')
-        # Since u_, v_ are given from the previous iteration, the
+        # Since u_, z_ are given from the previous iteration, the
         # problem is linear in phi,psi.
         solve(L == -dJ, dw, [bcW])
         
@@ -270,16 +276,17 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu_scale:
         step += 1
         
         # Project onto space of admissible displacements
-        # u, z = Function(U), Function(Z)
-        # rfau.assign(u, w.sub(0))
-        # rfaz.assign(z, w.sub(1))
-        # center_function(u, dim=2)
-        # center_function(z, dim=2)
-        # symmetrise_gradient(u, U)
-        # fau.assign(w.sub(0), u)
-        # faz.assign(w.sub(1), z)        
-        # HACK: go back to functions over subspaces
-        # u, z = w.split()
+        if projection:
+            u, z = Function(U), Function(Z)
+            fa_w2u.assign(u, w.sub(0))
+            fa_w2z.assign(z, w.sub(1))
+            center_function(u, dim=2)
+            center_function(z, dim=2)
+            symmetrise_gradient(u, U)
+            fa_u2w.assign(w.sub(0), u)
+            fa_z2w.assign(w.sub(1), z)        
+            # HACK: go back to functions over subspaces
+            u, z = w.split()
 
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
@@ -316,17 +323,16 @@ if __name__ == "__main__":
 
     results_file = "results-combined.pickle"
     
-    mesh_file = generate_mesh('circle', 12, 12)
+    mesh_file = generate_mesh('circle', 16, 10)
     theta_values = [0.1, 0.5, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80,
-                    90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
-                    250, 300, 400, 500]
-    
+                    90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200]
+        
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
     n_jobs = min(12, len(theta_values))
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('zero', 'frobenius', mesh_file,
-                                                         theta=theta, mu_scale=0.1,
-                                                         dirichlet_size=0, deg=1,
-                                                         max_steps=8000, save_funs=False, skip=8,
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
+                                                         theta=theta, mu_scale=1.0,
+                                                         dirichlet_size=0, deg=1, projection=False,
+                                                         max_steps=4000, save_funs=False, skip=8,
                                                          e_stop_mult=1e-8, debug=noop, n=n)
                                       for n, theta in enumerate(theta_values))
     save_results(new_res, results_file)

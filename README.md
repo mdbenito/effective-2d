@@ -137,13 +137,22 @@ After opening the `pvd` file, only two filters are necessary in the pipeline:
 * Fix the issues with nbimporter and leave the models in the notebooks,
   instead of having copies (yuk!) in python scripts for parallel runs.
 * Store results in a sensible database and update it while simulations are
-  still running.
+  still running. In particular, store *all* information required to reproduce
+  the run, like git commit, mesh, etc.
 * Be more systematic with "unique" identifiers for runs (crappy and fragile now).
 * Make the reports more flexible. Possibly ditch that webserver nonsense
   altogether and implement some cool iPython widgets based on pandas dataframes
   (or even just use something like [qgrid](https://github.com/quantopian/qgrid)).
 * Update licenses and acknowledgements to include all packages used.
 
+## Known issues
+
+* Sometimes, running `descent-*.py` with multiprocessing will result in dolfin's
+  JIT compiler throwing strange errors. Typically, restarting execution will solve
+  those, but sometimes the cache gets corrupted. The easiest workaround is to exit
+  the container and start a new one. Because of these problems, it might pay off to
+  do a first run with low max steps so as to be sure to have all forms precompiled
+  for the real run.
 
 ## License
 

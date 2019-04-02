@@ -30,9 +30,14 @@ from common import *
 from time import time
 
 
-def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0.0,
-              dirichlet_size: int = -1, deg: int = 1,
-              e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True, n=0):
+def noop(*args, **kwargs):
+    pass
+
+
+def run_model(init: str, qform: str, mesh_file: str, theta: float, mu:
+              float = 0.0, dirichlet_size: int = -1, deg: int = 1,
+              e_stop_mult: float = 1e-5, max_steps: int = 1000, skip:
+              int = 10, save_funs: bool = True, debug=print, n=0):
     """
     Parameters
     ----------
@@ -47,12 +52,15 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
         deg: polynomial degree to use
         e_stop_mult: Multiplier for the stopping condition.
         max_steps: Fallback maximum number of steps for gradient descent.
+        skip: save displacements every so many steps.
         save_funs: Whether to store the last values of the solutions and updates
                    in the returned dictionary (useful for plotting in a notebook but
                    useless for pickling)
         n: index of run in a parallel computation for the displaying of progress bars
     """
-    impl = 'curl-dirichlet' if dirichlet_size >= 0 else 'curl'
+    set_log_level(ERROR)
+    
+    impl = 'orig-curl-dirichlet' if dirichlet_size >= 0 else 'orig-curl'
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
 
     qform = qform.lower()
@@ -213,16 +221,18 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0
         step += 1
 
         #### Write displacements to file
-        debug("\tSaving... ", end='')
-        opd = compute_potential(v, V, subdomain, MARKER, 0.0)
-        fax.assign(disp.sub(0), u.sub(0))
-        fay.assign(disp.sub(1), u.sub(1))
-        faz.assign(disp.sub(2), opd)
-        file << (disp, float(step))
-        debug("Done.")
+        if step % skip == 0:
+            debug("\tSaving... ", end='')
+            opd = compute_potential(v, V, subdomain, MARKER, 0.0)
+            fax.assign(disp.sub(0), u.sub(0))
+            fay.assign(disp.sub(1), u.sub(1))
+            faz.assign(disp.sub(2), opd)
+            file << (disp, float(step))
+            debug("Done.")
 
         w_.vector()[:] = w.vector()
         u_, v_ = w_.split()
+
         t.update()
 
     _hist['time'] = time() - begin
@@ -251,20 +261,20 @@ if __name__ == "__main__":
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
-    set_log_level(ERROR)
-
     results_file = "results-combined.pickle"
-    mesh_file = generate_mesh('circle', 18, 18)
-    theta_values = [1.0] #np.arange(10,100,4)
+    mesh_file = generate_mesh('circle', 16, 11)
+    theta_values = np.array(list(np.arange(0.1, 20, 0.1))+list(np.arange(20, 50, 0.5))+list(np.arange(50,200,1)))
 
+    
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
-    n_jobs = min(2, len(theta_values))
+    n_jobs = min(32, len(theta_values))
 
     new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
                                                          theta=theta, mu=theta/10.0,
-                                                         dirichlet_size=-1, deg=1,
+                                                         dirichlet_size=0, deg=1,
                                                          max_steps=20000, save_funs=False,
-                                                         e_stop_mult=1e-8, n=n)
+                                                         skip=10 if theta < 20 else 25,
+                                                         e_stop_mult=1e-8, debug=noop, n=n)
                                       for n, theta in enumerate(theta_values))
 
     save_results(new_res, results_file)

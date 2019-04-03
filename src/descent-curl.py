@@ -1,0 +1,273 @@
+# coding: utf-8
+
+# # Problem definition
+# 
+# We wish to minimize
+# $$ I(u,v) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} \nabla v \otimes \nabla v|^{2} \mathrm{d}x
+#    + \frac{1}{24} \int_{\omega} |\nabla^2 v - \mathrm{Id}|^{2} \mathrm{d}x. $$
+# 
+# Because we only have $C^0$ elements we set $z$ for $\nabla v$ and minimize instead
+# 
+# $$ J(u,z) = \frac{\theta}{2} \int_{\omega} |\nabla_s u + \tfrac{1}{2} z \otimes z|^{2} \mathrm{d}x 
+#           + \frac{1}{24} \int_{\omega} |\nabla z - \mathrm{Id}|^{2} \mathrm{d}x 
+#           + \mu \int_{\omega} |\mathrm{curl}\ z|^{2} \mathrm{d}x, $$
+# 
+# then recover the vertical displacements (up to a constant) by minimizing
+# 
+# $$ F(p,q) = \tfrac{1}{2} || \nabla p - q ||^2 + \tfrac{1}{2} || q - z ||^2. $$
+# 
+# This we do by solving the linear problem $D F = 0$.
+# 
+# Minimization of the energy functional $J$ is done via gradient descent and a line search. In plane displacements
+# and gradients of out of plane displacements form a mixed function space $U \times Z$. We also have another scalar
+# space $V$ where the potential of the out of plane gradients lives. The model is defined and solved in `run_model()`
+# below. Experiments can be easily run in parallel with `joblib`.
+
+from dolfin import *
+import numpy as np
+from tqdm import tqdm
+from common import *
+from time import time
+
+def noop(*args, **kwargs):
+    pass
+
+
+def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 0.0,
+              dirichlet_size: int = -1, deg: int = 1, skip: int = 10,
+              e_stop_mult: float = 1e-5, max_steps: int = 400, save_funs: bool = True, n=0):
+    """
+    Parameters
+    ----------
+        init: Initial condition. One of 'zero', 'rot', 'parab', 'ani_parab',
+              'iso_compression', 'ani_compression', 'bartels'
+        qform: Quadratic form to use: 'frobenius' or 'isotropic' (misnomer...)
+        mesh_file: name of (gzipped) xml file with the mesh data
+        theta: coefficient for the nonlinear in-/out-of-plane mix of stresses
+        mu: penalty weight
+        dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
+                        > 0 to recursively enlarge the Dirichlet domain.
+        deg: polynomial degree to use
+        e_stop_mult: Multiplier for the stopping condition.
+        max_steps: Fallback maximum number of steps for gradient descent.
+        save_funs: Whether to store the last values of the solutions and updates
+                   in the returned dictionary (useful for plotting in a notebook but
+                   useless for pickling)
+        n: index of run in a parallel computation for the displaying of progress bars
+    """
+    set_log_level(ERROR)
+
+    impl = 'curl-dirichlet' if dirichlet_size >= 0 else 'curl'
+    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
+
+    qform = qform.lower()
+
+    msh = Mesh(mesh_file)
+
+    MARKER = 1
+    subdomain = FacetFunction("uint", msh, 0)
+    recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
+
+    def tout(s, **kwargs):
+        """ FIXME: Does not work as intended... """
+        t.write(s, end='')
+
+    debug = noop
+    # debug = print
+
+    # in plane displacements (IPD)
+    UE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
+    # Gradients of out of plane displacements (OPD)
+    VE = VectorElement("Lagrange", msh.ufl_cell(), deg, dim=2)
+    W = FunctionSpace(msh, UE * VE)
+    # will store out of plane displacements
+    V = FunctionSpace(msh, "Lagrange", deg)
+
+    # We gather in-plane and out-of-plane displacements into one
+    # Function for visualization with ParaView.
+    P = VectorFunctionSpace(msh, "Lagrange", deg, dim=3)
+    fax = FunctionAssigner(P.sub(0), W.sub(0).sub(0))
+    fay = FunctionAssigner(P.sub(1), W.sub(0).sub(1))
+    faz = FunctionAssigner(P.sub(2), V)
+
+    disp = Function(P)
+    disp.rename("disp", "displacement")
+
+    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
+
+    file_name = make_filename(impl, init, qform, theta, mu)
+    file = File(file_name)  # .vtu files will have the same prefix
+
+    w = Function(W)
+    w_ = Function(W)
+    u, v = w.split()
+    u_, v_ = w_.split()
+
+    w_init = make_initial_data_penalty(init)
+    w.interpolate(w_init)
+    w_.interpolate(w_init)
+
+    if qform == 'frobenius':
+        Q2, L2 = frobenius_form()
+    elif qform == 'isotropic':
+        # Isotropic density for steel at room temp.
+        # http://scienceworld.wolfram.com/physics/LameConstants.html
+        # breaks things (line searches don't end) because we need to scale
+        # elastic constants with h
+        E, nu = 210.0, 0.3
+        Q2, L2 = isotropic_form(E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 + 2 * nu))
+    else:
+        raise Exception("Unknown quadratic form name '%s'" % qform)
+
+    def eps(u):
+        return (grad(u) + grad(u).T) / 2.0
+        # E is in GPa. Is it ok to use these units? Setting it to 210e9
+
+    e_stop = msh.hmin() * e_stop_mult
+    max_line_search_steps = 20
+    step = 0
+    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
+    _hist = {'init': init, 'impl': impl, 'deg': deg, 'mesh': mesh_file,
+             'dirichlet': dirichlet_size, 'mu': mu, 'theta': theta, 'e_stop': e_stop,
+             'J': [], 'alpha': [], 'du': [], 'dv': [], 'constraint': [],
+             'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
+             'symmetry': [], 'file_name': file_name}
+
+    B = Identity(2)
+    zero_energy = assemble((1. / 24) * inner(B, B) * dx(msh))
+
+    def energy(u, v, mu=mu):
+        J = (theta / 2.) * Q2(eps(u) + outer(v, v) / 2) * dx(msh) \
+            + (1. / 24) * Q2(grad(v) - B) * dx(msh) \
+            + mu * inner(curl(v), curl(v)) * dx(msh)
+        return assemble(J)
+
+    # CAREFUL!! Picking the right scalar product here is essential
+    # Recall the issues with boundary values: integrate partially and only boundary terms survive...
+    dtu, dtv = TrialFunctions(W)
+    phi, psi = TestFunctions(W)
+    L = inner(dtu, phi) * dx + inner(grad(dtu), grad(phi)) * dx \
+        + inner(dtv, psi) * dx + inner(grad(dtv), grad(psi)) * dx
+
+    dw = Function(W)
+    du, dv = dw.split()
+
+    # Output initial condition
+    opd = compute_potential(v, V, subdomain, MARKER, 0.0)
+    fax.assign(disp.sub(0), u.sub(0))
+    fay.assign(disp.sub(1), u.sub(1))
+    faz.assign(disp.sub(2), opd)
+    file << (disp, float(step))
+
+    cur_energy = energy(u, v)
+    alpha = ndu = ndv = 1.0
+
+    debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
+          % (theta, mu, e_stop, max_steps))
+
+    begin = time()
+    while alpha * (ndu ** 2 + ndv ** 2) > e_stop and step < max_steps:
+        _curl = assemble(curl(v_) * dx)
+        _symmetry = circular_symmetry(disp)
+        _hist['constraint'].append(_curl)
+        _hist['symmetry'].append(_symmetry)
+        debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
+              % (step, cur_energy, _curl, _symmetry))
+
+        #### Gradient
+        # for some reason I'm not able to use derivative(J, w_, dtw)
+        dJ = theta * L2(eps(u_) + outer(v_, v_) / 2,
+                        eps(phi) + sym(outer(v_, psi))) * dx(msh) \
+             + (1. / 12) * L2(grad(v_) - B, grad(psi)) * dx(msh) \
+             + 2 * mu * inner(curl(v_), curl(psi)) * dx(msh)
+
+        debug("\tSolving...", end='')
+        solve(L == -dJ, dw, [bcW])
+
+        du, dv = dw.split()
+        # dw is never reassigned to a new object so it's ok
+        # to reuse du, dv without resplitting
+        ndu = norm(du)
+        ndv = norm(dv)
+
+        debug(" done with |du| = %.3f, |dv| = %.3f" % (ndu, ndv))
+
+        #### Line search
+        new_energy = 0
+        debug("\tSearching... ", end='')
+        while True:
+            w = project(w_ + alpha * dw, W)
+            u, v = w.split()
+            new_energy = energy(u, v)
+            if new_energy <= cur_energy - omega * alpha * (ndu ** 2 + ndv ** 2):
+                debug(" alpha = %.2e" % alpha)
+                _hist['J'].append(cur_energy)
+                _hist['alpha'].append(alpha)
+                _hist['du'].append(ndu)
+                _hist['dv'].append(ndv)
+                cur_energy = new_energy
+                alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
+                break
+            if alpha < (1. / 2) ** max_line_search_steps:
+                raise Exception("Line search failed after %d steps" % max_line_search_steps)
+            alpha /= 2.0  # Repeat with smaller alpha
+
+        step += 1
+
+        #### Write displacements to file
+        if step % skip == 0:
+            debug("\tSaving... ", end='')
+            opd = compute_potential(v, V, subdomain, MARKER, 0.0)
+            fax.assign(disp.sub(0), u.sub(0))
+            fay.assign(disp.sub(1), u.sub(1))
+            faz.assign(disp.sub(2), opd)
+            file << (disp, float(step))
+            debug("Done.")
+
+        w_.vector()[:] = w.vector()
+        u_, v_ = w_.split()
+        t.update()
+
+    _hist['time'] = time() - begin
+
+    if step < max_steps:
+        t.total = step
+        t.update()
+
+    _hist['steps'] = step
+    if save_funs:
+        _hist['disp'] = disp
+        _hist['u'] = u
+        _hist['v'] = v
+        _hist['dtu'] = du
+        _hist['dtv'] = dv
+    debug("Done after %d steps" % step)
+
+    t.close()
+    return _hist
+
+
+if __name__ == "__main__":
+
+    from joblib import Parallel, delayed
+
+    parameters["form_compiler"]["optimize"] = True
+    parameters["form_compiler"]["cpp_optimize"] = True
+
+    results_file = "results-combined.pickle"
+    mesh_file = generate_mesh('circle', 17, 10)
+    theta_values = np.array(list(np.arange(0.1, 20, 0.1))+list(np.arange(20, 50, 0.5))+list(np.arange(50,200,1)))
+
+    
+    # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
+    n_jobs = min(32, len(theta_values))
+
+    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
+                                                         theta=theta, mu=theta/10.0,
+                                                         dirichlet_size=0, deg=1,
+                                                         max_steps=20000, save_funs=False,
+                                                         skip=10 if theta < 20 else 25,
+                                                         e_stop_mult=1e-8, n=n)
+                                      for n, theta in enumerate(theta_values))
+
+    save_results(new_res, results_file)

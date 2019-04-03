@@ -211,21 +211,28 @@ def save_results(results: dict, results_file: str):
 
 
 def generate_mesh(kind:str, m:int, n:int) -> str:
-    """ Generates a mesh, saves it to a file and returns the file name.
-    Generation is only performed once.
-     """
-    mesh_file = 'mesh-%dx%d-%s.xml.gz' % (m, n, kind)
+    """ Generates an unstructured mesh, saves it to a file and returns the
+    file name. Generation is only performed once.
+
+    Parameters
+    ----------
+        kind: 'circle' or 'rectangle'
+        m: number of subdivisions for circle. Ignored for rectangle
+        n: number of refinements for generation.
+
+    """
+    mesh_file = '../meshes/mesh-%dx%d-%s.xml.gz' % (m, n, kind)
 
     if not os.path.isfile(mesh_file):
         if kind.lower() == 'circle':
             domain = mshr.Circle(Point(0.0, 0.0), 1, m)
-            msh = mshr.generate_mesh(domain, n)
-        elif kind.lower == 'rectangle':
-            msh = RectangleMesh(Point(-1, -1), Point(1, 1), m, n)
+        elif kind.lower() == 'rectangle':
+            domain = mshr.Polygon([Point(-1,-1), Point(1, -1),
+                                   Point(1, 1), Point(-1, 1)])
         else:
             raise TypeError('Unhandled mesh type "%s"' % kind)
-        File(mesh_file) << msh
 
+        File(mesh_file) << mshr.generate_mesh(domain, n)
     return mesh_file
 
 

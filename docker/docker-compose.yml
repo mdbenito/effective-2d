@@ -1,0 +1,61 @@
+version: '3.3'
+
+networks:
+  lvk:
+    driver: bridge
+
+volumes:
+  mongo-data:
+
+services:
+  mongo:
+    image: mongo:4.1-bionic
+    ports:
+      - 0.0.0.0:27017:27017
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - lvk
+
+  omniboard:
+    image: vivekratnavel/omniboard:1.3.0
+    command: ["-m", "mongo:27017:lvk"]
+    ports:
+      - 0.0.0.0:9000:9000
+    restart: unless-stopped
+    networks:
+      - lvk
+    depends_on:
+      - mongo
+ 
+  notebooks:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["fenics-notebook"]
+    volumes:
+      - ../output:/home/fenics/lvk/output
+      - ../src:/home/fenics/lvk/src
+    ports:
+      - 0.0.0.0:8888:8888
+    networks:
+      - lvk
+    depends_on:
+      - mongo
+
+  reports:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["report-server", "0.0.0.0", "8080"]
+    volumes:
+      # Need to remove these
+      - ../output:/home/fenics/lvk/output
+      - ../src:/home/fenics/lvk/src    
+    ports:
+      - 0.0.0.0:8080:8080
+    networks:
+      - lvk
+    depends_on:
+      - mongo

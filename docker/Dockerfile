@@ -20,9 +20,9 @@ ENV bin=/usr/local/bin
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends vim && \
     rm -rf /var/lib/apt/lists/*
-RUN pip3 install --no-cache-dir --upgrade pip notebook ipykernel && \
-    pip3 install --no-cache-dir jupyterthemes jupyter_contrib_nbextensions && \
-    pip3 install --no-cache-dir nbimporter autograd tqdm joblib && \
+COPY docker/requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir -r /tmp/requirements.txt && \
     jupyter contrib nbextension install --system && \
     jupyter nbextensions_configurator enable
 

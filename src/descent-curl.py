@@ -33,29 +33,55 @@
 # `run_model()` below. Experiments can be easily run in parallel with
 # `joblib`.
 
+#from joblib import Parallel, delayed
 from dolfin import *
 import numpy as np
 from tqdm import tqdm
 from common import *
 from time import time
 
+from sacred import Experiment
+from sacred.observers import MongoObserver
+from sacred import SETTINGS
 
-def noop(*args, **kwargs):
-    pass
+SETTINGS['CAPTURE_MODE'] = 'no'
+
+ex = Experiment('descent-curl')
+
+@ex.config
+def current_config():
+    init = 'ani_parab'
+    qform = 'frobenius'
+    mesh_type = 'rectangle'
+    mesh_m = 11
+    mesh_n = 11
+    theta = 1.0
+    mu_scale = 1.0
+    dirichlet_size = 0
+    deg = 1
+    projection = True
+    e_stop_mult = 1e-8
+    max_steps = 8000
+    skip = 10 if theta < 20 else 20
+    save_funs = True
 
 
-def run_model(init: str, qform: str, mesh_file: str, theta: float,
-              mu_scale: float = 1.0, dirichlet_size: int = -1, deg:
-              int = 1, projection: bool = False, e_stop_mult: float =
-              1e-5, max_steps: int = 1000, skip: int = 10, save_funs:
-              bool = True, debug=print, n=0):
+@ex.main
+def run_model(_log, _run, init: str, qform: str, mesh_type: str,
+              mesh_m: int, mesh_n: int, theta: float, mu_scale:
+              float = 1.0, dirichlet_size: int = -1, deg: int = 1,
+              projection: bool = False, e_stop_mult: float = 1e-5,
+              max_steps: int = 1000, skip: int = 10, save_funs: bool =
+              True, n=0):
     """
     Parameters
     ----------
         init: Initial condition. One of 'zero', 'rot', 'parab', 'ani_parab',
               'iso_compression', 'ani_compression', 'bartels'
         qform: Quadratic form to use: 'frobenius' or 'isotropic' (misnomer...)
-        mesh_file: name of (gzipped) xml file with the mesh data
+        mesh_type: either 'rectangle' or 'circle'
+        mesh_m: first number of subdivisions of mesh (radial for circle)
+        mesh_n: second number of subdivisions of mesh
         theta: coefficient for the nonlinear in-/out-of-plane mix of stresses
         mu_scale: compute penalty weight as mu_scale / msh.hmin()
         dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
@@ -70,15 +96,19 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float,
         save_funs: Whether to store the last values of the solutions and updates
                    in the returned dictionary (useful for plotting in a notebook but
                    useless for pickling)
-        debug: set to noop or print
+        debug_fun: set to noop or print
         n: index of run in a parallel computation for the displaying of progress bars
     """
-    set_log_level(ERROR)
-    
+    set_log_level(ERROR)  # shut fenics up
+
+    debug = _log.debug
+
     impl = 'curl-proj-dirichlet' if dirichlet_size >= 0 else 'curl-proj'
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
-
+    
     MARKER = 1
+    mesh_file = generate_mesh(mesh_type, mesh_m, mesh_n)
+    _run.add_resource(mesh_file)
     msh = Mesh(mesh_file)
     subdomain = FacetFunction("uint", msh, 0)
     recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
@@ -195,13 +225,6 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float,
     omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
     alpha = ndu = ndz = 1.0
     
-    _hist = {'init': init, 'impl': impl, 'deg': deg, 'mesh': mesh_file,
-             'projection': projection, 'dirichlet': dirichlet_size, 'mu': mu,
-             'theta': theta, 'e_stop': e_stop, 'file_name': file_name,
-             'J': [], 'alpha': [], 'du': [], 'dz': [], 'constraint': [],
-             'Q2': {'form_name': Q2.__name__, 'arguments': Q2.arguments},
-             'Kxx': [], 'Kxy': [], 'Kyy': [],'symmetry': []}
-    
     debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."
           % (theta, mu, e_stop, max_steps))
     
@@ -214,19 +237,19 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float,
     L = inner(dtu, phi) * dx + inner(grad(dtu), grad(phi)) * dx \
         + inner(dtz, psi) * dx + inner(grad(dtz), grad(psi)) * dx
 
-    begin = time()
     domain_area = assemble(1*dx(msh))
     
     while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:
         _curl = assemble(curl(z_) * dx)
         K = project(sym(grad(z_)), T)
-        _hist['Kxx'].append(assemble(K[0,0]*dx)/domain_area)
-        _hist['Kxy'].append(assemble(K[0,1]*dx)/domain_area)
-        _hist['Kyy'].append(assemble(K[1,1]*dx)/domain_area)
+        _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
+        _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
+        _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)
         
         _symmetry = symmetry(disp)
-        _hist['constraint'].append(_curl)
-        _hist['symmetry'].append(_symmetry)
+        _run.log_scalar('constraint', _curl)
+        _run.log_scalar('symmetry', _symmetry)
+        _run.log_scalar('circ_symmetry', circular_symmetry(disp))
         debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
               % (step, cur_energy, _curl, _symmetry))
 
@@ -262,10 +285,10 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float,
             new_energy = energy(u, z)
             if new_energy <= cur_energy - omega * alpha * (ndu ** 2 + ndz ** 2):
                 debug(" alpha = %.2e" % alpha)
-                _hist['J'].append(cur_energy)
-                _hist['alpha'].append(alpha)
-                _hist['du'].append(ndu)
-                _hist['dz'].append(ndz)
+                _run.log_scalar('J', cur_energy)
+                _run.log_scalar('alpha', alpha)
+                _run.log_scalar('du', ndu)
+                _run.log_scalar('dz', ndz)
                 cur_energy = new_energy
                 alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
                 break
@@ -295,44 +318,54 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float,
             save_displacements(u, z, step)
         t.update()
 
-    _hist['time'] = time() - begin
-
     if step < max_steps:
         t.total = step
         t.update()
 
-    _hist['steps'] = step
     if save_funs:
-        _hist['disp'] = disp
-        _hist['u'] = u
-        _hist['v'] = compute_potential(z, V, subdomain, MARKER, 0.0)
-        _hist['dtu'] = du
-        _hist['dtz'] = dz
+        v =  compute_potential(z, V, subdomain, MARKER, 0.0)
+        for s, var in (('disp', disp), ('u', u), ('v', v), ('dtu', du), ('dtz', dz)):
+            new_file_name = file_name[:-4] + '-' + s + '.pvd' # HACK
+            File(new_file_name, "compressed") << (var, 0.0)
+            _run.add_artifact(new_file_name)
+            _run.add_artifact(new_file_name[:-4] + "000000.vtu") # HACK
     debug("Done after %d steps" % step)
 
     t.close()
-    return _hist
 
+    
+def run(config_updates):
+    """From https://github.com/IDSIA/sacred/issues/391
 
-if __name__ == "__main__":
+    (...)you should add the MongoObserver only after forking the
+    process and have to watch out that you don't add the same observer
+    twice. Also the run itself cannot be returned as a result of the
+    future as it can't be pickled. I am curious to hear you
+    experiences.
+    """
 
-    from joblib import Parallel, delayed
+    if not ex.observers:        
+        ex.observers.append(MongoObserver.create(url='mongo:27017',
+                                                 db_name='lvk'))
+    r = ex.run(config_updates=config_updates)
+    return r.result
 
+if __name__ == '__main__':
+    from concurrent import futures
+    
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
-    results_file = "results-combined.pickle"
-    
-    mesh_file = generate_mesh('circle', 16, 10)
-    theta_values = [0.1, 0.5, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80,
-                    90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200]
-        
+    theta_values = np.array(list(np.arange(0, 2, 0.05))
+                            + list(np.arange(2, 10, 0.1))
+                            + list(np.arange(10, 100, 1))
+                            + list(np.arange(100, 500, 10)))
     # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
-    n_jobs = min(12, len(theta_values))
-    new_res = Parallel(n_jobs=n_jobs)(delayed(run_model)('ani_parab', 'frobenius', mesh_file,
-                                                         theta=theta, mu_scale=1.0,
-                                                         dirichlet_size=0, deg=1, projection=False,
-                                                         max_steps=4000, save_funs=False, skip=8,
-                                                         e_stop_mult=1e-8, debug=noop, n=n)
-                                      for n, theta in enumerate(theta_values))
-    save_results(new_res, results_file)
+    n_jobs = min(18, len(theta_values))
+    # r = Parallel(n_jobs=n_jobs)(delayed(run)(config_updates={'n': n, 'theta': theta})
+    #                             for n, theta in enumerate(theta_values))
+    with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
+        tasks = [executor.submit(run, {'n': n, 'theta': theta})
+                 for n, theta in enumerate(theta_values)]
+        for future in futures.as_completed(tasks):
+            print(future.result())

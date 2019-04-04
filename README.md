@@ -4,107 +4,112 @@ Energy minimization schemes for the generalised von Kármán model in [1].
 
 ## Model and discretisation
 
-[1] describes an effective two dimensional theory for multilayered plates in
-the von Kármán regime. The resulting functional is minimised here with vanilla
-gradient descent on mixed continuous Lagrange spaces with a penalty formulation.
+[1] describes an effective two dimensional theory for multilayered
+plates in the von Kármán regime. The resulting functional is minimised
+here with vanilla gradient descent on mixed continuous Lagrange spaces
+with a penalty formulation.
 
-The model is characterised by the interplay of both membrane and bending
-energies, with a parameter $\theta$ interpolating it from the Kirchhoff to the
-linearised von Kármán regimes. We explore qualitative aspects of the
-minimisers as a function of $\theta$, in particular the breaking of symmetry
-at a critical value.
+The model is characterised by the interplay of both membrane and
+bending energies, with a parameter $\theta$ interpolating it from the
+Kirchhoff to the linearised von Kármán regimes. We explore qualitative
+aspects of the minimisers as a function of $\theta$, in particular the
+breaking of symmetry at a critical value.
 
-Gradient descent provides convergence to the expected minimisers (proven to be
-global for small $\theta$ in [1])
+Gradient descent provides convergence to the expected minimisers
+(proven to be global for small $\theta$ in [1])
 
-We try to circumvent the use of Kirchhoff Discrete Triangles in the method 
-of [2] without success. Some progress in the implementation of these
-elements for FEniCS is [here](https://bitbucket.org/mdbenito/hermite). Note
-however that this requires extensive changes and additions to FIAT and FFC, which
-are available in [my]([https://bitbucket.org/mdbenito/fiat-fork) 
-[forks](https://bitbucket.org/mdbenito/ffc-fork) but are quite hacky and not
-thoroughly tested.
+We try to circumvent the use of Kirchhoff Discrete Triangles in the
+method of [2] without success. Some progress in the implementation of
+these elements for FEniCS is
+[here](https://bitbucket.org/mdbenito/hermite). Note however that this
+requires extensive changes and additions to FIAT and FFC, which are
+available in [my]([https://bitbucket.org/mdbenito/fiat-fork)
+[forks](https://bitbucket.org/mdbenito/ffc-fork) but are quite hacky
+and not thoroughly tested.
 
-Results of the computations are stored both as VTK files in folders and as
-pickled objects containing relevant quantities gathered during the
-computations. It is ugly and should probably be replaced by some database like
-sqlite or some document store / nosql thingy. 
+Displacement fields at different steps during the minimisation are
+stored as VTK files in folders. Additionally relevant metrics are 
+logged to a MongoDB using [sacred](https://github.com/IDSIA/sacred).
 
-## Requirements
+Our legacy custom results explorer only supports pickled metrics, so
+we store those at well, but it should be trivial to replace them by
+custom mongo queries.
 
-All you need is a working docker installation to build the image and start
-the container. All dependencies are contained in the image. To build it,
-from the root of the project run:
-
-```
-docker build -f docker/Dockerfile -t lvk:latest .
-```
 
 ## Usage
 
-To start a notebook server run (this will share the output and source
-directories with the container, so they persist after exiting it):
+All you need is a working [docker](https://docker.io) installation to
+build the image and start all services. To build and start everything,
+from the root of the project run:
 
-```shell
-docker run -v $(pwd)/output:/home/fenics/lvk/output \
-           -v $(pwd)/src:/home/fenics/lvk/src \
-           -p 8888:8888 \
-           --rm -it --name lvk lvk fenics-notebook
 ```
-The jupyter server will be accessible at http://localhost:8888
-Password and token authentication have been disabled for the server!
+cd docker && sudo docker-compose -p lvk up
+```
 
-Alternatively, you can run `sudo docker/start-notebook`, which basically
-does the above.
+After building, that command will start four services: MongoDB,
+Omniboard, jupyter and the custom results server. The output and
+source directories will be shared with some containers for
+convenience. In particular, this allows local edition of the source
+files which the notebook service sees.
 
-### Reports
+**Password and token authentication have been disabled for all
+services!**
 
-The script `src/report.py` implements a minimal web server to explore results
-in tabular form and easily combine them into plots. It is not the _definitive_
-dashboard, but it was fun and quick to do. The nice jQuery table is done with
- [FooTable](http://fooplugins.github.io/FooTable/),
-the fixed header with
- [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
+* Juyter will be accessible at http://localhost:8888
+* Omniboard will be accessible at http://localhost:9000
+* The custom results server will be at http://localhost:8080
+
+In order to run experiments, assuming you only have one instance of
+the whole setup running:
+
+```
+sudo docker exec -it lvk_notebooks_1 bash
+cd src
+python3 descent-curl.py
+```
+
+## Experiment tracking and reports
+
+Experiments are stored in a MongoDB and can be individually browsed
+using Omniboard (see above).
+
+For the investigation of multiple experiments jointly, the minimal
+results server displays them in tabular form and allows to easily
+combine them into plots.
+
+It is possible to plot the evolution of the method in time for
+different runs side by side. Also, links to the ParaView files are
+displayed and should open, after properly configuring the system
+(e.g. adding mime types and handlers for xdg-open)
+
+The report server is by far not the _definitive_ dashboard, but it was
+fun and quick to do.  The nice jQuery table in the report server is
+done with [FooTable](http://fooplugins.github.io/FooTable/), the fixed
+header with
+[stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
 I also used some js and css from [codepen](https://codepen.io).
-
-It is possible to plot the evolution of the method in time for different runs
-side by side. Also, links to the ParaView files are displayed and should open, after
-properly configuring the system (e.g. adding mime types and handlers for xdg-open)
-
-
-To start the results server, run:
-
-```shell
-docker run -v $(pwd)/output:/home/fenics/lvk/output \
-           -v $(pwd)/src:/home/fenics/lvk/src \
-           -p 8080:8080 \
-           --rm -it --name lvk-report \
-           lvk "report-server 0.0.0.0 8080"
-```
-
-Then go to http://localhost:8080
-
-Alternatively, you can run `sudo docker/start-report`, which basically
-does the above.
 
 
 ## Detailed contents
 
-* `docker`: `Dockerfile` to build an image and scripts to be installed in it.
+* `docker`: `docker-compose.yml` to build docker images and scripts to
+  be installed in it.
 * `src`: Source files. Inside you will find:
-   * `descent-curl.py`: Gradient descent for a modified functional with only first
-     order derivatives and a penalty term enforcing the condition that 
-     $z = \nabla v$. The fact that the penalty term can be left out provides
-     some experimental evidence that minimisers of the new functional automatically
-     fulfill a vanishing curl constraint.
-   * `descent-curl.ipynb`: Notebook accompanying `descent-curl.py` with some
-     exploratory plots.
+   * `descent-curl.py`: Gradient descent for a modified functional
+     with only first order derivatives and a penalty term enforcing
+     the condition that $z = \nabla v$. The fact that the penalty term
+     can be left out provides some experimental evidence that
+     minimisers of the new functional automatically fulfill a
+     vanishing curl constraint.
+   * `descent-curl.ipynb`: Notebook accompanying `descent-curl.py`
+     with some exploratory plots.
    * `descent-mixed.py`: Mixed formulation for gradient descent.
-   * `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py` with some
-     exploratory plots.
-   * `von Karman.ipynb`: Implementation of the model in [2]. (Not working)
-   * `von Karman mixed.ipynb`: Implementation of the model in [2] using a
-     mixed model formulation. (Not working)
+   * `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py`
+     with some exploratory plots.
+   * `von Karman.ipynb`: Implementation of the model in [2]. (Not
+     working)
+   * `von Karman mixed.ipynb`: Implementation of the model in [2]
+     using a mixed model formulation. (Not working)
    * `report.py`: a server to explore results. See "Reports" below.
  
   
@@ -136,9 +141,8 @@ After opening the `pvd` file, only two filters are necessary in the pipeline:
 
 * Fix the issues with nbimporter and leave the models in the notebooks,
   instead of having copies (yuk!) in python scripts for parallel runs.
-* Store results in a sensible database and update it while simulations are
-  still running. In particular, store *all* information required to reproduce
-  the run, like git commit, mesh, etc.
+* Implement polling of the sacred db for jobs and queued execution
+  ([see here](https://github.com/IDSIA/sacred/issues/215)))
 * Be more systematic with "unique" identifiers for runs (crappy and fragile now).
 * Make the reports more flexible. Possibly ditch that webserver nonsense
   altogether and implement some cool iPython widgets based on pandas dataframes

@@ -1,9 +1,5 @@
 version: '3.3'
 
-networks:
-  lvk:
-    driver: bridge
-
 volumes:
   mongo-data:
 
@@ -15,8 +11,6 @@ services:
     restart: unless-stopped
     volumes:
       - mongo-data:/data/db
-    networks:
-      - lvk
 
   omniboard:
     image: vivekratnavel/omniboard:1.3.0
@@ -24,8 +18,6 @@ services:
     ports:
       - 0.0.0.0:9000:9000
     restart: unless-stopped
-    networks:
-      - lvk
     depends_on:
       - mongo
  
@@ -39,8 +31,6 @@ services:
       - ../src:/home/fenics/lvk/src
     ports:
       - 0.0.0.0:8888:8888
-    networks:
-      - lvk
     depends_on:
       - mongo
 
@@ -55,7 +45,5 @@ services:
       - ../src:/home/fenics/lvk/src    
     ports:
       - 0.0.0.0:8080:8080
-    networks:
-      - lvk
     depends_on:
       - mongo

@@ -355,13 +355,24 @@ def job(config_updates: dict):
 # FIXME: arbitrary kwargs are NOT passed to parallel() via the CLI
 #
 @ex.command(unobserved=True) # Do not create a DB entry for this launcher
-def parallel(max_jobs: int=18, theta_values: list=None, **kwargs):
+def parallel(max_jobs: int=18, theta_values: list=None,
+             extra_args: dict=None):
     """Runs a number of experiments in parallel.
+
+    Arguments
+    ---------
+        max_jobs: number of parallel jobs to run
+        theta_values: list of floats
+        extra_args: e.g. {'mesh_type': 'circle', 'mesh_n': 12,
+                          'max_steps': 1000}
 
     Careful: hyperthreading might not help with max_jobs (you are
     probably bound by memory channel bandwidth)
     """
     from concurrent import futures
+
+    if not extra_args:
+        extra_args = {}
 
     if not theta_values:
         theta_values = list(np.arange(0, 2, 0.05)) \
@@ -372,12 +383,12 @@ def parallel(max_jobs: int=18, theta_values: list=None, **kwargs):
     
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        tasks = [executor.submit(job, dict(kwargs, n=n, theta=theta))
+        tasks = [executor.submit(job, dict(extra_args, n=n, theta=theta))
                  for n, theta in enumerate(theta_values)]
         for future in futures.as_completed(tasks):
             print(future.result())
 
-       
+
 if __name__ == '__main__':
 
     parameters["form_compiler"]["optimize"] = True

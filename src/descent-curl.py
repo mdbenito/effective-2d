@@ -351,8 +351,11 @@ def job(config_updates: dict):
     return r.result
 
 
+#
+# FIXME: arbitrary kwargs are NOT passed to parallel() via the CLI
+#
 @ex.command(unobserved=True) # Do not create a DB entry for this launcher
-def parallel(max_jobs: int=18, theta_values: list=None):
+def parallel(max_jobs: int=18, theta_values: list=None, **kwargs):
     """Runs a number of experiments in parallel.
 
     Careful: hyperthreading might not help with max_jobs (you are
@@ -369,7 +372,7 @@ def parallel(max_jobs: int=18, theta_values: list=None):
     
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        tasks = [executor.submit(job, {'n': n, 'theta': theta})
+        tasks = [executor.submit(job, dict(kwargs, n=n, theta=theta))
                  for n, theta in enumerate(theta_values)]
         for future in futures.as_completed(tasks):
             print(future.result())

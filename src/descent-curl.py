@@ -249,7 +249,6 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         _symmetry = symmetry(disp)
         _run.log_scalar('constraint', _curl)
         _run.log_scalar('symmetry', _symmetry)
-        _run.log_scalar('circ_symmetry', circular_symmetry(disp))
         debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
               % (step, cur_energy, _curl, _symmetry))
 

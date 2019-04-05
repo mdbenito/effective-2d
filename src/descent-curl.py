@@ -378,5 +378,7 @@ if __name__ == '__main__':
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
+    ex.observers.append(MongoObserver.create(url='mongo:27017',
+                                             db_name='lvk'))
     ex.run_commandline()
 

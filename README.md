@@ -115,24 +115,21 @@ I also used some js and css from [codepen](https://codepen.io).
 * `docker`: `docker-compose.yml` to build docker images and scripts to
   be installed in it.
 * `src`: Source files. Inside you will find:
-   * `descent-curl.py`: Gradient descent for a modified functional
+   * `descent_curl.py`: Gradient descent for a modified functional
      with only first order derivatives and a penalty term enforcing
      the condition that $z = \nabla v$. The fact that the penalty term
      can be left out provides some experimental evidence that
      minimisers of the new functional automatically fulfill a
      vanishing curl constraint.
-   * `descent-curl.ipynb`: Notebook accompanying `descent-curl.py`
-     with some exploratory plots.
-   * `descent-mixed.py`: Mixed formulation for gradient descent.
-   * `descent-mixed.ipynb`: Notebook accompanying `descent-mixed.py`
-     with some exploratory plots.
+   * `descent_mixed.py`: Mixed formulation for gradient descent
+     (outdated, use the other model instead).
+   * `explore.ipynb`: Notebook with some exploratory plots.
    * `von Karman.ipynb`: Implementation of the model in [2]. (Not
      working)
    * `von Karman mixed.ipynb`: Implementation of the model in [2]
      using a mixed model formulation. (Not working)
-   * `report.py`: a server to explore results. See "Reports" below.
+   * `report.py`: a server to explore results. See above.
  
-  
 
 ## Plotting with ParaView
 
@@ -149,29 +146,20 @@ After opening the `pvd` file, only two filters are necessary in the pipeline:
  2. **Warp by vector** to see the displacement.
 
 
-## Dependencies
-
-*  with Python3 support.
- [This docker container]() contains all of it plus a few extra goodies.
-* [tqdm](https://github.com/tqdm/tqdm) for the silly progress bars.
- I really shouldn't have made that necessary.
-
-
 ## Things to do that ~~probably~~ won't happen
 
-* Fix the issues with nbimporter and leave the models in the notebooks,
-  instead of having copies (yuk!) in python scripts for parallel runs.
 * Implement polling of the sacred db for jobs and queued execution
   ([see here](https://github.com/IDSIA/sacred/issues/215)))
-* Be more systematic with "unique" identifiers for runs (crappy and fragile now).
 * Make the reports more flexible. Possibly ditch that webserver nonsense
   altogether and implement some cool iPython widgets based on pandas dataframes
   (or even just use something like [qgrid](https://github.com/quantopian/qgrid)).
 * Update licenses and acknowledgements to include all packages used.
+* Fix dependency conflicts in requiremets.txt
+
 
 ## Known issues
 
-* Sometimes, running `descent-*.py` with multiprocessing will result in dolfin's
+* Sometimes, running `descent_*.py` with multiprocessing will result in dolfin's
   JIT compiler throwing strange errors. Typically, restarting execution will solve
   those, but sometimes the cache gets corrupted. The easiest workaround is to exit
   the container and start a new one. Because of these problems, it might pay off to

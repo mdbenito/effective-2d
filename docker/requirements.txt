@@ -11,3 +11,4 @@ nbimporter==0.3.1
 autograd==1.2
 pymongo==3.7.2
 GitPython==2.1.11
+incense==0.0.7

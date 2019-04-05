@@ -10,3 +10,4 @@ jupyter_contrib_nbextensions==0.5.1
 nbimporter==0.3.1
 autograd==1.2
 pymongo==3.7.2
+GitPython==2.1.11

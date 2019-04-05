@@ -72,7 +72,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
               float = 1.0, dirichlet_size: int = -1, deg: int = 1,
               projection: bool = False, e_stop_mult: float = 1e-5,
               max_steps: int = 1000, skip: int = 10, save_funs: bool =
-              True, n=0):
+              True, n: int=0):
     """
     Parameters
     ----------
@@ -334,7 +334,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     t.close()
 
     
-def job(config_updates):
+def job(config_updates: dict):
     """From https://github.com/IDSIA/sacred/issues/391
 
     (...)you should add the MongoObserver only after forking the
@@ -344,7 +344,7 @@ def job(config_updates):
     experiences.
     """
 
-    if not ex.observers:        
+    if not ex.observers:
         ex.observers.append(MongoObserver.create(url='mongo:27017',
                                                  db_name='lvk'))
     r = ex.run(config_updates=config_updates)
@@ -352,19 +352,21 @@ def job(config_updates):
 
 
 @ex.command(unobserved=True) # Do not create a DB entry for this launcher
-def parallel(max_jobs: int=18):
-    """Runs a number of experiments in parallel (range of theta hardcoded)
+def parallel(max_jobs: int=18, theta_values: list=None):
+    """Runs a number of experiments in parallel.
 
     Careful: hyperthreading might not help with max_jobs (you are
     probably bound by memory channel bandwidth)
     """
     from concurrent import futures
-    
-    theta_values = np.array(list(np.arange(0, 2, 0.05))
-                            + list(np.arange(2, 10, 0.1))
-                            + list(np.arange(10, 100, 1))
-                            + list(np.arange(100, 500, 10)))
 
+    if not theta_values:
+        theta_values = list(np.arange(0, 2, 0.05)) \
+                       + list(np.arange(2, 10, 0.1)) \
+                       + list(np.arange(10, 100, 1)) \
+                       + list(np.arange(100, 500, 10))
+    theta_values = np.array(theta_values)
+    
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
         tasks = [executor.submit(job, {'n': n, 'theta': theta})

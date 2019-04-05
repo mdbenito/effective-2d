@@ -334,7 +334,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     t.close()
 
     
-def run(config_updates):
+def job(config_updates):
     """From https://github.com/IDSIA/sacred/issues/391
 
     (...)you should add the MongoObserver only after forking the
@@ -350,22 +350,33 @@ def run(config_updates):
     r = ex.run(config_updates=config_updates)
     return r.result
 
-if __name__ == '__main__':
+
+@ex.command(unobserved=True) # Do not create a DB entry for this launcher
+def parallel(max_jobs: int=18):
+    """Runs a number of experiments in parallel (range of theta hardcoded)
+
+    Careful: hyperthreading might not help with max_jobs (you are
+    probably bound by memory channel bandwidth)
+    """
     from concurrent import futures
     
-    parameters["form_compiler"]["optimize"] = True
-    parameters["form_compiler"]["cpp_optimize"] = True
-
     theta_values = np.array(list(np.arange(0, 2, 0.05))
                             + list(np.arange(2, 10, 0.1))
                             + list(np.arange(10, 100, 1))
                             + list(np.arange(100, 500, 10)))
-    # Careful: hyperthreading won't help (we are probably bound by memory channel bandwidth)
-    n_jobs = min(18, len(theta_values))
-    # r = Parallel(n_jobs=n_jobs)(delayed(run)(config_updates={'n': n, 'theta': theta})
-    #                             for n, theta in enumerate(theta_values))
+
+    n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        tasks = [executor.submit(run, {'n': n, 'theta': theta})
+        tasks = [executor.submit(job, {'n': n, 'theta': theta})
                  for n, theta in enumerate(theta_values)]
         for future in futures.as_completed(tasks):
             print(future.result())
+
+       
+if __name__ == '__main__':
+
+    parameters["form_compiler"]["optimize"] = True
+    parameters["form_compiler"]["cpp_optimize"] = True
+
+    ex.run_commandline()
+

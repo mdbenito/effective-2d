@@ -31,16 +31,20 @@ Displacement fields at different steps during the minimisation are
 stored as VTK files in folders. Additionally relevant metrics are 
 logged to a MongoDB using [sacred](https://github.com/IDSIA/sacred).
 
-Our legacy custom results explorer only supports pickled metrics, so
-we store those at well, but it should be trivial to replace them by
-custom mongo queries.
+There is (legacy) custom results explorer which only supports pickled
+metrics, so we store those at well, but it should be trivial to
+replace them by custom mongo queries.
 
 
-## Usage
+## Dependencies and usage
 
-All you need is a working [docker](https://docker.io) installation to
-build the image and start all services. To build and start everything,
-from the root of the project run:
+This project requires [FEniCS 2017.1.0](https://fenicsproject.org) and
+a few python libraries, but everything is packaged using [docker
+compose](https://docs.docker.com/compose/). All you need is a working
+[docker](https://docker.io) installation to build the image and start
+all services.
+
+To build and start everything, from the root of the project run:
 
 ```
 cd docker && sudo docker-compose -p lvk up
@@ -59,33 +63,49 @@ services!**
 * Omniboard will be accessible at http://localhost:9000
 * The custom results server will be at http://localhost:8080
 
-In order to run experiments, assuming you only have one instance of
-the whole setup running:
+In order to run experiments from the console, you can open a console
+into the notebooks container, which also mounts the code from your
+local repository (the whole `src/` folder is shared). Assuming you
+only have one instance of the whole setup running, run:
 
 ```
 sudo docker exec -it lvk_notebooks_1 bash
 cd src
-python3 descent-curl.py
+python3 descent-curl.py help
 ```
+
+Parameters can be changed in the command line using `with`. Parallel
+execution of multiple experiments can be launched with `parallel` and
+so on. Please read [sacred's
+documentation](https://sacred.readthedocs.io/en/latest/quickstart.html)
+for more on how to use the command line interface.
+
 
 ## Experiment tracking and reports
 
 Experiments are stored in a MongoDB and can be individually browsed
 using Omniboard (see above).
 
-For the investigation of multiple experiments jointly, the minimal
-results server displays them in tabular form and allows to easily
-combine them into plots.
+However, omniboard is not enough for the investigation of multiple
+experiments jointly. For this a minimal results server displays them
+in tabular form and allows to easily combine them into plots (the
+"custom results server" mentioned above, available at
+http://localhost:8080).
 
-It is possible to plot the evolution of the method in time for
-different runs side by side. Also, links to the ParaView files are
-displayed and should open, after properly configuring the system
-(e.g. adding mime types and handlers for xdg-open)
+Using this browser, it is possible to plot the evolution of the method
+in time for different runs side by side. Also, links to the ParaView
+files are displayed and should open, after properly configuring the
+system (e.g. adding mime types and handlers for xdg-open)
 
-The report server is by far not the _definitive_ dashboard, but it was
-fun and quick to do.  The nice jQuery table in the report server is
-done with [FooTable](http://fooplugins.github.io/FooTable/), the fixed
-header with
+Additionally, the notebooks provide some basic code to query the
+results database and create plots across the range of values of theta
+tested in the experiments. See ...
+
+**Disclaimer:** The report server is by far not the _definitive_
+dashboard, but it was fun and quick to do.  The nice jQuery table in
+the report server is done with
+[FooTable](http://fooplugins.github.io/FooTable/), the fixed header
+with
 [stickyTableHeaders](https://github.com/jmosbech/StickyTableHeaders).
 I also used some js and css from [codepen](https://codepen.io).
 
@@ -131,7 +151,7 @@ After opening the `pvd` file, only two filters are necessary in the pipeline:
 
 ## Dependencies
 
-* A working installation of FEniCS 2017.1.0 with Python3 support.
+*  with Python3 support.
  [This docker container]() contains all of it plus a few extra goodies.
 * [tqdm](https://github.com/tqdm/tqdm) for the silly progress bars.
  I really shouldn't have made that necessary.

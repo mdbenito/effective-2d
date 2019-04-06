@@ -12,7 +12,7 @@ __all__ = ["make_initial_data_mixed", "make_initial_data_penalty",
            "center_function", "compute_potential", "load_results",
            "save_results", "generate_mesh", "eps",
            "symmetrise_gradient", "frobenius_form", "isotropic_form",
-           "filter_results", "make_filename", "recursively_intersect"]
+           "make_filename", "recursively_intersect"]
 
 
 def make_initial_data_mixed(which: str, degree=2) -> Expression:

@@ -73,7 +73,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
               projection: bool = False, e_stop_mult: float = 1e-5,
               max_steps: int = 1000, skip: int = 10, save_funs: bool =
               True, n: int=0):
-    """
+    """ Computes minimal energy with penalty term using (projected) gradient descent
+
     Parameters
     ----------
         init: Initial condition. One of 'zero', 'rot', 'parab', 'ani_parab',
@@ -98,6 +99,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
                    useless for pickling)
         debug_fun: set to noop or print
         n: index of run in a parallel computation for the displaying of progress bars
+
     """
     set_log_level(ERROR)  # shut fenics up
 

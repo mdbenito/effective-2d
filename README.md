@@ -36,7 +36,7 @@ metrics, so we store those at well, but it should be trivial to
 replace them by custom mongo queries.
 
 
-## Dependencies and usage
+## Usage
 
 This project requires [FEniCS 2017.1.0](https://fenicsproject.org) and
 a few python libraries, but everything is packaged using [docker
@@ -51,7 +51,7 @@ cd docker && sudo docker-compose -p lvk up
 ```
 
 After building, that command will start four services: MongoDB,
-Omniboard, jupyter and the custom results server. The output and
+Omniboard, JupyterLab and the custom results server. The output and
 source directories will be shared with some containers for
 convenience. In particular, this allows local edition of the source
 files which the notebook service sees.
@@ -59,19 +59,25 @@ files which the notebook service sees.
 **Password and token authentication have been disabled for all
 services!**
 
-* Juyter will be accessible at http://localhost:8888
+* JupyterLab will be accessible at http://localhost:8888
 * Omniboard will be accessible at http://localhost:9000
 * The custom results server will be at http://localhost:8080
 
-In order to run experiments from the console, you can open a console
-into the notebooks container, which also mounts the code from your
-local repository (the whole `src/` folder is shared). Assuming you
-only have one instance of the whole setup running, run:
+In order to run experiments from the console, you can open a terminal
+inside JupyterLab and run the script `descent_curl.py`. The code is
+qmounted from your local repository: the whole `src/` folder is
+share inside `/home/fenics/lvk/src`. To see command line options,
+from that location, run 
+
+```
+python3 descent-curl.py help
+```
+
+If instead you wish to open a console into the notebooks container,
+assuming you only have one instance of the whole setup running, run:
 
 ```
 sudo docker exec -it lvk_notebooks_1 bash
-cd src
-python3 descent-curl.py help
 ```
 
 Parameters can be changed in the command line using `with`. Parallel
@@ -89,8 +95,8 @@ as well as the paraview mesh files under `output/`.
 
 ## Experiment tracking and reports
 
-Experiments are stored in a MongoDB and can be individually browsed
-using Omniboard (see above).
+Experiments are stored in a (persistent) MongoDB and can be
+individually browsed using Omniboard (see above).
 
 However, omniboard is not enough for the investigation of multiple
 experiments jointly. For this a minimal results server displays them
@@ -139,7 +145,10 @@ I also used some js and css from [codepen](https://codepen.io).
 
 ## Plotting with ParaView
 
-After opening the `pvd` file, only two filters are necessary in the pipeline:
+Displacement fields are stored as collections of `vtu` files, indexed
+by a `pvd` file. In paraview, after opening one of the latter, only
+two filters are necessary in the visualization pipeline in order to
+see the output:
  1. **Calculator** to de-scale the displacements. Recall that in-plane
   displacements scale with the square of the plate's thickness $h$ whereas
   out-of-plane do linearly with it: $u_h = h^2 u, v_h = h v$
@@ -156,26 +165,31 @@ After opening the `pvd` file, only two filters are necessary in the pipeline:
 
 * Implement polling of the sacred db for jobs and queued execution
   ([see here](https://github.com/IDSIA/sacred/issues/215)))
-* Make the reports more flexible. Possibly ditch that webserver nonsense
-  altogether and implement some cool iPython widgets based on pandas dataframes
-  (or even just use something like [qgrid](https://github.com/quantopian/qgrid)).
+* Make the reports more flexible. Possibly ditch that webserver
+  nonsense altogether and implement some cool iPython widgets based on
+  pandas dataframes (or even just use something like
+  [qgrid](https://github.com/quantopian/qgrid)).
 * Update licenses and acknowledgements to include all packages used.
-* Fix dependency conflicts in requiremets.txt
 
 
 ## Known issues
 
-* Sometimes, running `descent_*.py` with multiprocessing will result in dolfin's
-  JIT compiler throwing strange errors. Typically, restarting execution will solve
-  those, but sometimes the cache gets corrupted. The easiest workaround is to exit
-  the container and start a new one. Because of these problems, it might pay off to
-  do a first run with low max steps so as to be sure to have all forms precompiled
-  for the real run.
-
+* Sometimes, running `descent_*.py` with multiprocessing will result
+  in dolfin's JIT compiler throwing strange errors. Typically,
+  restarting execution will solve those, but sometimes the cache gets
+  corrupted. The easiest workaround is to exit the container and start
+  a new one. Because of these problems, it might pay off to do a first
+  run with low max steps so as to be sure to have all forms
+  precompiled for the real run.
+* `docker-compose` can fail to start the network under Windows systems
+  with messages like `driver failed programming external connectivity
+  on endpoint` or `network not found`. If this happens, try restarting
+  the docker daemon. Also remember to tear down all services using
+  `docker-compose down`.
 ## License
 
-All my code is released under the GNU GPL v3. See the licenses of the included
-software too.
+All my code is released under the GNU GPL v3. See the licenses of the
+included software too.
 
 
 ## References

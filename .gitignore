@@ -7,3 +7,5 @@
 *.pk
 __pycache__/
 \.idea/
+
+*.eps

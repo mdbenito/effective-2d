@@ -29,9 +29,7 @@
 # descent and a line search. In plane displacements and gradients of
 # out of plane displacements form a mixed function space $U \times
 # Z$. We also have another scalar space $V$ where the potential of the
-# out of plane gradients lives. The model is defined and solved in
-# `run_model()` below. Experiments can be easily run in parallel with
-# `joblib`.
+# out of plane gradients lives.
 
 from dolfin import *
 import numpy as np
@@ -45,7 +43,7 @@ from sacred import SETTINGS
 
 SETTINGS['CAPTURE_MODE'] = 'no'
 
-ex = Experiment('descent-curl')
+ex = Experiment()
 
 @ex.config
 def current_config():

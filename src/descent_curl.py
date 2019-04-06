@@ -33,7 +33,6 @@
 # `run_model()` below. Experiments can be easily run in parallel with
 # `joblib`.
 
-#from joblib import Parallel, delayed
 from dolfin import *
 import numpy as np
 from tqdm import tqdm
@@ -352,9 +351,6 @@ def job(config_updates: dict):
     return r.result
 
 
-#
-# FIXME: arbitrary kwargs are NOT passed to parallel() via the CLI
-#
 @ex.command(unobserved=True) # Do not create a DB entry for this launcher
 def parallel(max_jobs: int=18, theta_values: list=None,
              extra_args: dict=None):

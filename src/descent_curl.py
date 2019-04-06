@@ -100,6 +100,10 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         n: index of run in a parallel computation for the displaying of progress bars
 
     """
+
+    if not ex.observers:
+        ex.observers.append(MongoObserver.create(url='mongo:27017', db_name='lvk'))
+  
     set_log_level(ERROR)  # shut fenics up
 
     debug = _log.debug
@@ -391,7 +395,5 @@ if __name__ == '__main__':
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
 
-    ex.observers.append(MongoObserver.create(url='mongo:27017',
-                                             db_name='lvk'))
     ex.run_commandline()
 

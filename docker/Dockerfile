@@ -22,9 +22,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY docker/requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir -r /tmp/requirements.txt && \
-    jupyter contrib nbextension install --system && \
-    jupyter nbextensions_configurator enable
+    pip3 install --no-cache-dir -r /tmp/requirements.txt
 
 ##############################################################################
 # Setup terminal, editor related stuff and assorted tools
@@ -47,19 +45,12 @@ RUN mkdir $home/.jupyter
 COPY docker/jupyter_notebook_config.json $home/.jupyter/
 
 ##############################################################################
-# Final setup, enable SSH, fix permissions
-# FIXME
-#  - The systemctl call does not start the service automatically
-#  - Remember to MANUALLY add your public key to access the container via ssh
-#    (the COPY command is disabled because of the automated builds)
+# Final setup, fix permissions
 
 RUN /bin/cat /tmp/dot_bashrc_extra >> $home/.bashrc && \
     rm -f /tmp/dot_bashrc_extra && \
-    systemctl enable ssh  && \
-    mkdir -p $home/.ssh && \
     chmod 744 $bin/fenics-notebook $bin/report-server && \
     chown -R fenics.fenics $home/.* $bin/fenics-notebook \
                            $bin/report-server
-#COPY id_rsa.pub $home/.ssh/authorized_keys
 
 WORKDIR $home

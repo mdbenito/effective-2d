@@ -13,7 +13,7 @@ services:
       - mongo-data:/data/db
 
   omniboard:
-    image: vivekratnavel/omniboard:1.3.0
+    image: vivekratnavel/omniboard:1.4.0
     command: ["-m", "mongo:27017:lvk"]
     ports:
       - 0.0.0.0:9000:9000

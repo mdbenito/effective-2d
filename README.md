@@ -80,6 +80,12 @@ so on. Please read [sacred's
 documentation](https://sacred.readthedocs.io/en/latest/quickstart.html)
 for more on how to use the command line interface.
 
+In order to tear down all containers:
+```
+cd docker && sudo docker-compose -p lvk down
+```
+This leaves the experiment database as a docker volume in the system,
+as well as the paraview mesh files under `output/`.
 
 ## Experiment tracking and reports
 

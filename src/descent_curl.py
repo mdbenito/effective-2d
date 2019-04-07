@@ -97,11 +97,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         debug_fun: set to noop or print
         n: index of run in a parallel computation for the displaying of progress bars
 
-    """
-
-    if not ex.observers:
-        ex.observers.append(MongoObserver.create(url='mongo:27017', db_name='lvk'))
-  
+    """  
     set_log_level(ERROR)  # shut fenics up
 
     debug = _log.debug
@@ -390,8 +386,14 @@ def parallel(max_jobs: int=18, theta_values: list=None,
 
 if __name__ == '__main__':
 
+    import sys
+
     parameters["form_compiler"]["optimize"] = True
     parameters["form_compiler"]["cpp_optimize"] = True
+
+    # HACK
+    if not "parallel" in [a.lower() for a in sys.argv]:
+        ex.observers.append(MongoObserver.create(url='mongo:27017', db_name='lvk'))
 
     ex.run_commandline()
 

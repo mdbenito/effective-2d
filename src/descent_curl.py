@@ -149,7 +149,9 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     
     # will store out-of-plane displacements (potential of z)
     V = FunctionSpace(msh, "Lagrange", deg)
-
+    v = Function(V)
+    v.rename("pot", "potential")
+    
     # We gather in-plane and out-of-plane displacements into one
     # Function for visualization with ParaView.
     P = VectorFunctionSpace(msh, "Lagrange", deg, dim=3)
@@ -163,16 +165,16 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     file_name = make_filename(impl, init, qform, theta, mu)
     file = File(file_name, "compressed")  # .vtu files will have the same prefix
 
-    def save_displacements(u, z, step):
-        debug("\tSaving... ", end='')
-        v = compute_potential(z, V, subdomain, MARKER, 0.0)
+    def update_displacements(u, z, step, save):
+        compute_potential(z, v, subdomain, MARKER, 0.0)
         fa_w2x.assign(disp.sub(0), u.sub(0))
         fa_w2y.assign(disp.sub(1), u.sub(1))
         fa_v2z.assign(disp.sub(2), v)
-        file << (disp, float(step))        
-        debug("Done.")
-        
-    
+        if save:
+            debug("\tSaving... ", end='')
+            file << (disp, float(step))        
+            debug("Done.")
+     
     bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
 
     # Solution at time t ("current step")
@@ -189,7 +191,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     w_init = make_initial_data_penalty(init)
     w.interpolate(w_init)
     w_.interpolate(w_init)
-    save_displacements(u, z, 0)  # Output it too
+    update_displacements(u, z, 0, save=True)  # Output it too
     
     # Setup forms and energy
     if qform == 'frobenius':
@@ -238,21 +240,10 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
 
     domain_area = assemble(1*dx(msh))
     
-    while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:
-        _curl = assemble(curl(z_) * dx)
-        K = project(sym(grad(z_)), T)
-        _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
-        _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
-        _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)
-        
-        _symmetry = symmetry(disp)
-        _run.log_scalar('constraint', _curl)
-        _run.log_scalar('symmetry', _symmetry)
-        debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
-              % (step, cur_energy, _curl, _symmetry))
-
-        #### Gradient
-        # for some reason I'm not able to use derivative(J, w_, dtw)
+    while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:    
+        #####
+        # Compute gradient update
+        # XXX: for some reason I'm not able to use derivative(J, w_, dtw)
         dJ = theta * L2(eps(u_) + outer(z_, z_) / 2,
                         eps(phi) + sym(outer(z_, psi))) * dx(msh) \
              + (1. / 12) * L2(grad(z_) - B, grad(psi)) * dx(msh) \
@@ -261,17 +252,15 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         # Since u_, z_ are given from the previous iteration, the
         # problem is linear in phi,psi.
         solve(L == -dJ, dw, [bcW])
-        
         # dw is never reassigned to a new object so it should be ok
         # to reuse du, dv without resplitting right?
         du, dz = dw.split()
-        
         ndu = norm(du)
         ndz = norm(dz)
-
         debug(" done with |du| = %.3f, |dz| = %.3f" % (ndu, ndz))
 
-        #### Line search
+        #####
+        # Line search
         new_energy = 0
         debug("\tSearching... ", end='')
         while not fail:
@@ -283,19 +272,15 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
             new_energy = energy(u, z)
             if new_energy <= cur_energy - omega * alpha * (ndu ** 2 + ndz ** 2):
                 debug(" alpha = %.2e" % alpha)
-                _run.log_scalar('J', cur_energy)
-                _run.log_scalar('alpha', alpha)
-                _run.log_scalar('du', ndu)
-                _run.log_scalar('dz', ndz)
                 cur_energy = new_energy
-                alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
                 break
             if alpha < (1. / 2) ** max_line_search_steps:
                 fail = True
                 debug("Line search failed after %d steps" % max_line_search_steps)
+                break
             alpha /= 2.0  # Repeat with smaller alpha
-        step += 1
         
+        #####
         # Project onto space of admissible displacements
         if projection:
             u, z = Function(U), Function(Z)
@@ -309,11 +294,33 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
             # HACK: go back to functions over subspaces
             u, z = w.split()
 
+        #####
+        # Save result into variables for previous timestep and output
+        # files and metrics
+        update_displacements(u, z, step, save = step % skip == 0)
+        
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
 
-        if step % skip == 0:
-            save_displacements(u, z, step)
+        K = project(sym(grad(z_)), T)
+        _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
+        _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
+        _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)            
+
+        _curl = assemble(curl(z_) * dx)
+        _symmetry = symmetry(disp)  # disp is udpated in update_displacements()
+        _run.log_scalar('constraint', _curl)
+        _run.log_scalar('symmetry', _symmetry)
+        debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
+              % (step, cur_energy, _curl, _symmetry))
+
+        _run.log_scalar('J', cur_energy)
+        _run.log_scalar('du', ndu)
+        _run.log_scalar('dz', ndz)
+        _run.log_scalar('alpha', alpha)
+        alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
+        
+        step += 1
         t.update()
 
     if step < max_steps:
@@ -321,7 +328,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         t.update()
 
     if save_funs:
-        v =  compute_potential(z, V, subdomain, MARKER, 0.0)
+        # FIXME: need to save these in XML format to be able to read back from FEniCS
+        compute_potential(z, v, subdomain, MARKER, 0.0)
         for s, var in (('disp', disp), ('u', u), ('v', v), ('dtu', du), ('dtz', dz)):
             new_file_name = file_name[:-4] + '-' + s + '.pvd' # HACK
             File(new_file_name, "compressed") << (var, 0.0)

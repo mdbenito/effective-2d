@@ -191,8 +191,8 @@ def test_symmetrise_gradient() -> bool:
     return True
     
 
-def compute_potential(z: Function, V: FunctionSpace, dirichlet:FacetFunction=None,
-                      MARKER:int=1, value: float = 0.0) -> Function:
+def compute_potential(z: Function, v: Function, dirichlet:FacetFunction=None,
+                      MARKER:int=1, value: float = 0.0) -> None:
     """ Takes a gradient and computes its potential.
 
     We solve the linear problem:
@@ -209,14 +209,13 @@ def compute_potential(z: Function, V: FunctionSpace, dirichlet:FacetFunction=Non
     Parameters
     ---------
         :param z: gradient
-        :param V: space for the potential
+        :param v: Function to store the potential:
+                  $v \in V$ such that $\nabla v = z$ and $v = \text{value}$ on 'dirichlet'
         :param dirichlet: subdomain where the potential is fixed to 'value' (mark is 'MARK')
         :param value: value that the potential takes at 'zero'
         :param MARKER: value that the FacetFunction takes at the Dirichlet subdomain
-    Returns
-    -------
-        Function $v \in V$ such that $\nabla v = z$ and $v = \text{value}$ on 'dirichlet'
     """
+    V = v.function_space()
     msh = z.function_space().mesh()
 
     # Construct a mixed function space for the potential and gradient
@@ -241,11 +240,8 @@ def compute_potential(z: Function, V: FunctionSpace, dirichlet:FacetFunction=Non
     w = Function(W)
     solve(a == L, w, [bcP, bcQ])
 
-    ret = Function(V)
     fa = FunctionAssigner(V, W.sub(0))
-    fa.assign(ret, w.sub(0))
-    ret.rename("pot", "potential")
-    return ret
+    fa.assign(v, w.sub(0))
 
 
 def test_potential(fun_exp: str, grad_exp: (str, str), eps: float = 1e-4) -> bool:

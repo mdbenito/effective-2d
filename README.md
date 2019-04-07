@@ -163,6 +163,10 @@ see the output:
 
 ## Things to do that ~~probably~~ won't happen
 
+* Config script:
+  - generate random user and password
+  - build the mongo and jupyterlab containers configured with those
+  
 * Implement polling of the sacred db for jobs and queued execution
   ([see here](https://github.com/IDSIA/sacred/issues/215)))
 * Make the reports more flexible. Possibly ditch that webserver
@@ -171,21 +175,28 @@ see the output:
   [qgrid](https://github.com/quantopian/qgrid)).
 * Update licenses and acknowledgements to include all packages used.
 
-
 ## Known issues
 
-* Sometimes, running `descent_*.py` with multiprocessing will result
-  in dolfin's JIT compiler throwing strange errors. Typically,
-  restarting execution will solve those, but sometimes the cache gets
-  corrupted. The easiest workaround is to exit the container and start
-  a new one. Because of these problems, it might pay off to do a first
-  run with low max steps so as to be sure to have all forms
-  precompiled for the real run.
+* Running `descent_*.py` with multiprocessing will often result in
+  dolfin's JIT compiler throwing strange I/O errors and jobs failing.
+  Typically, relaunching will solve the issue since forms will be read
+  from disk. However, the cache sometimes gets corrupted. The easiest
+  workaround is to exit the container and start a new one. Because of
+  these problems, it might pay off to do a first run with low max
+  steps so as to be sure to have all forms precompiled for the real
+  run.
 * `docker-compose` can fail to start the network under Windows systems
   with messages like `driver failed programming external connectivity
   on endpoint` or `network not found`. If this happens, try restarting
   the docker daemon. Also remember to tear down all services using
   `docker-compose down`.
+* Omniboard has a tendency to run out of memory, both the server and
+  the browser. The server is given 4GB of ram in `docker-compose.yml`,
+  and it's easy to adjust. As to the browser app, the current
+  (v.1.4.0) workaround is to filter results based on experiment name,
+  id, etc. so as to never have more than a few hundred. Additionally,
+  reducing the frequency at which metrics are stored might help.
+
 ## License
 
 All my code is released under the GNU GPL v3. See the licenses of the

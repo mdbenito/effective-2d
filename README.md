@@ -28,8 +28,10 @@ available in [my]([https://bitbucket.org/mdbenito/fiat-fork)
 and not thoroughly tested.
 
 Displacement fields at different steps during the minimisation are
-stored as VTK files in folders. Additionally relevant metrics are 
-logged to a MongoDB using [sacred](https://github.com/IDSIA/sacred).
+stored as VTK files in folders. Additional relevant metrics are logged
+to a MongoDB using [sacred](https://github.com/IDSIA/sacred) and are
+visualised using
+[Omniboard](https://github.com/vivekratnavel/omniboard).
 
 There is (legacy) custom results explorer which only supports pickled
 metrics, so we store those at well, but it should be trivial to
@@ -48,36 +50,32 @@ To build and start everything, from the root of the project run:
 
 ```
 cd docker && sudo docker-compose -p lvk up
+sudo docker exec -it -u fenics lvk_notebooks_1 bash
 ```
 
-After building, that command will start four services: MongoDB,
-Omniboard, JupyterLab and the custom results server. The output and
-source directories will be shared with some containers for
-convenience. In particular, this allows local edition of the source
-files which the notebook service sees.
-
-**Password and token authentication have been disabled for all
-services!**
+After building, the first command will start four services: MongoDB,
+Omniboard, JupyterLab and the custom results server.
 
 * JupyterLab will be accessible at http://localhost:8888
 * Omniboard will be accessible at http://localhost:9000
 * The custom results server will be at http://localhost:8080
 
-In order to run experiments from the console, you can open a terminal
-inside JupyterLab and run the script `descent_curl.py`. The code is
-qmounted from your local repository: the whole `src/` folder is
-share inside `/home/fenics/lvk/src`. To see command line options,
-from that location, run 
+**Password and token authentication have been disabled for all
+services!**
+
+The second command will open a shell into one of the containers, with
+the output and source directories shared for convenience in
+`/home/fenics/lvk`. In particular, this allows local edition of the
+source files which the notebook service sees. You can also open a
+terminal inside JupyterLab.
+
+The main script is `src/descent_curl.py`. Remember that the code is
+mounted from your local repository: the whole `src/` folder is shared
+as `/home/fenics/lvk/src`. To see command line options, from that
+location, run
 
 ```
 python3 descent-curl.py help
-```
-
-If instead you wish to open a console into the notebooks container,
-assuming you only have one instance of the whole setup running, run:
-
-```
-sudo docker exec -it lvk_notebooks_1 bash
 ```
 
 Parameters can be changed in the command line using `with`. Parallel
@@ -91,7 +89,7 @@ In order to tear down all containers:
 cd docker && sudo docker-compose -p lvk down
 ```
 This leaves the experiment database as a docker volume in the system,
-as well as the paraview mesh files under `output/`.
+as well as the VTK files for ParaView under `output/`.
 
 ## Experiment tracking and reports
 
@@ -166,7 +164,6 @@ see the output:
 * Config script:
   - generate random user and password
   - build the mongo and jupyterlab containers configured with those
-  
 * Implement polling of the sacred db for jobs and queued execution
   ([see here](https://github.com/IDSIA/sacred/issues/215)))
 * Make the reports more flexible. Possibly ditch that webserver
@@ -190,12 +187,18 @@ see the output:
   on endpoint` or `network not found`. If this happens, try restarting
   the docker daemon. Also remember to tear down all services using
   `docker-compose down`.
+* If working with the WSL under Windows, mounting folders with the
+  linux client and the windows docker daemon cannot work, so one has
+  to use `docker-compose.exe` from a windows console and inside the
+  regular windows file system.
 * Omniboard has a tendency to run out of memory, both the server and
   the browser. The server is given 4GB of ram in `docker-compose.yml`,
   and it's easy to adjust. As to the browser app, the current
   (v.1.4.0) workaround is to filter results based on experiment name,
   id, etc. so as to never have more than a few hundred. Additionally,
-  reducing the frequency at which metrics are stored might help.
+  reducing the frequency at which metrics are stored might help. See
+  [this issue](https://github.com/vivekratnavel/omniboard/issues/87)
+  for more information.
 
 ## License
 

@@ -5,7 +5,7 @@ volumes:
 
 services:
   mongo:
-    image: mongo:4.1-bionic
+    image: mongo:4.0.8-xenial
     ports:
       - 0.0.0.0:27017:27017
     restart: unless-stopped

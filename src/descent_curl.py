@@ -386,7 +386,7 @@ def parallel(max_jobs: int=18, theta_values: list=None,
     
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        tasks = [executor.submit(job, dict(extra_args, n=n, theta=theta))
+        tasks = [executor.submit(job, dict(extra_args, n=n%max_jobs, theta=theta))
                  for n, theta in enumerate(theta_values)]
         for future in futures.as_completed(tasks):
             print(future.result())

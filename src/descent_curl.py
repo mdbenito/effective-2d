@@ -53,28 +53,33 @@ ex = Experiment(uuid4().hex[:7])
 def current_config():
     init = 'ani_parab'
     qform = 'frobenius'
-    mesh_type = 'rectangle'
-    mesh_m = 11
-    mesh_n = 11
+    mesh_type = 'circle'
     theta = 1.0
-    mu_scale = 1.0
+    mesh_m = 60
+    mesh_n = 60
     dirichlet_size = 0
+    mu_scale = 1.0
+    hmin_power = 1.5  # mu = mu_scale / msh.hmin()**hmin_power
     deg = 1
     projection = True
     e_stop_mult = 1e-8
-    max_steps = 8000
-    skip = 10 if theta < 20 else 20
-    save_funs = True
-
+    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
+    max_line_search_steps = 20
+    max_steps = 18000
+    skip = 20 if theta < 20 else 40
+    save_funs = False
+    n = 0
 
 @ex.main
 def run_model(_log, _run, init: str, qform: str, mesh_type: str,
-              mesh_m: int, mesh_n: int, theta: float, mu_scale:
-              float = 1.0, dirichlet_size: int = -1, deg: int = 1,
-              projection: bool = False, e_stop_mult: float = 1e-5,
-              max_steps: int = 1000, skip: int = 10, save_funs: bool =
-              True, n: int=0):
-    """ Computes minimal energy with penalty term using (projected) gradient descent
+              mesh_m: int, mesh_n: int, theta: float, mu_scale: float
+              = 1.0, hmin_power: float=1.0, dirichlet_size: int = -1,
+              deg: int = 1, projection: bool = False, e_stop_mult:
+              float = 1e-5, omega: float = 0.25,
+              max_line_search_steps: int = 20, max_steps: int = 1000,
+              skip: int = 10, save_funs: bool = True, n: int=0):
+    """ Computes minimal energy with penalty term using (projected)
+    gradient descent
 
     Parameters
     ----------
@@ -86,6 +91,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         mesh_n: second number of subdivisions of mesh
         theta: coefficient for the nonlinear in-/out-of-plane mix of stresses
         mu_scale: compute penalty weight as mu_scale / msh.hmin()
+        hmin_power: mu = mu_scale / msh.hmin()**hmin_power
         dirichlet_size: -1 to deactivate Dirichlet BCs, 0 for one cell.
                         > 0 to recursively enlarge the Dirichlet domain.
         deg: polynomial degree to use
@@ -93,13 +99,16 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
                  functions with vanishing mean and vanishing mean anti-symmetric
                  gradient.
         e_stop_mult: Multiplier for the stopping condition.
+        omega:     Gradient descent fudge factor in (0, 1/2)
+        max_line_search_steps: 
         max_steps: Fallback maximum number of steps for gradient descent.
         skip: save displacements every so many steps.
         save_funs: Whether to store the last values of the solutions and updates
-                   in the returned dictionary (useful for plotting in a notebook but
-                   useless for pickling)
+                   in the returned dictionary (useful for plotting in a notebook
+                   but useless for pickling)
         debug_fun: set to noop or print
-        n: index of run in a parallel computation for the displaying of progress bars
+        n: index of run in a parallel computation for the displaying of progress
+            bars
 
     """  
     set_log_level(ERROR)  # shut fenics up
@@ -115,7 +124,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     msh = Mesh(mesh_file)
     subdomain = FacetFunction("uint", msh, 0)
     recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
-    mu = mu_scale / msh.hmin()
+                          recurr=dirichlet_size)
+    mu = mu_scale / msh.hmin()**hmin_power
 
     # FIXME: generalise symmetry calculations to avoid this hack
     # Even better, use curvature instead
@@ -225,10 +235,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     ####### Set up gradient descent method and history
     
     e_stop = msh.hmin() * e_stop_mult
-    max_line_search_steps = 20
     fail = False
     step = 0
-    omega = 0.25  # Gradient descent fudge factor in (0, 1/2)
     alpha = ndu = ndz = 1.0
     
     debug("Solving with theta = %.2e, mu = %.2e, eps=%.2e for at most %d steps."

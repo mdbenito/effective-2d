@@ -390,7 +390,9 @@ def parallel(max_jobs: int=18, theta_values: list=None,
     if not extra_args:
         extra_args = {}
 
-    theta_values = np.array(theta_values) if not theta_values else np.arange(1, 100, 5)
+    if not theta_values:
+        theta_values = np.arange(1, 100, 5).astype(np.float)
+    theta_values = np.array(theta_values)
 
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:

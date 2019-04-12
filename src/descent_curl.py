@@ -116,14 +116,14 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     debug = _log.debug
 
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n,
-    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
+             dynamic_ncols=True)
     
     MARKER = 1
     mesh_file = generate_mesh(mesh_type, mesh_m, mesh_n)
     _run.add_resource(mesh_file)
     msh = Mesh(mesh_file)
     subdomain = FacetFunction("uint", msh, 0)
-    recursively_intersect(msh, subdomain, Point(0, 0), MARKER, recurr=dirichlet_size)
+    recursively_intersect(msh, subdomain, Point(0, 0), MARKER,
                           recurr=dirichlet_size)
     mu = mu_scale / msh.hmin()**hmin_power
 
@@ -151,11 +151,12 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     T = TensorFunctionSpace(msh, 'DG', 0)
 
     if projection:
-        # Removing the antisymmetric part of the gradient requires constructing
-        # functions in subspaces of W, which does not work because of dof orderings
-        # A solution is to collapse() the subspaces, but again dof ordering is not
-        # kept. In the end I'll just copy stuff around until I find something better.
-        # HACK HACK HACK, inefficient, this sucks
+        # Removing the antisymmetric part of the gradient requires
+        # constructing functions in subspaces of W, which does not
+        # work because of dof orderings A solution is to collapse()
+        # the subspaces, but again dof ordering is not kept. In the
+        # end I'll just copy stuff around until I find something
+        # better.  HACK HACK HACK, inefficient, this sucks
         fa_u2w = FunctionAssigner(W.sub(0), U)
         fa_z2w = FunctionAssigner(W.sub(1), Z)
         fa_w2u = FunctionAssigner(U, W.sub(0))
@@ -214,10 +215,11 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     elif qform == 'isotropic':
         # Isotropic density for steel at room temp.
         # http://scienceworld.wolfram.com/physics/LameConstants.html
-        # breaks things (line searches don't end) because we need to scale
-        # elastic constants with h
+        # breaks things (line searches don't end) because we need to
+        # scale elastic constants with h
         E, nu = 210.0, 0.3
-        Q2, L2 = isotropic_form(E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 + 2 * nu))
+        Q2, L2 = isotropic_form(E * nu / ((1 + nu) * (1 - 2 * nu)),
+                                E / (2 + 2 * nu))
     else:
         raise Exception("Unknown quadratic form name '%s'" % qform)
 
@@ -388,13 +390,8 @@ def parallel(max_jobs: int=18, theta_values: list=None,
     if not extra_args:
         extra_args = {}
 
-    if not theta_values:
-        theta_values = list(np.arange(0, 2, 0.05)) \
-                       + list(np.arange(2, 10, 0.1)) \
-                       + list(np.arange(10, 100, 1)) \
-                       + list(np.arange(100, 500, 10))
-    theta_values = np.array(theta_values)
-    
+    theta_values = np.array(theta_values) if not theta_values else np.arange(1, 100, 5)
+
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
         tasks = [executor.submit(job, dict(extra_args, n=n%max_jobs, theta=theta))

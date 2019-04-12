@@ -33,17 +33,21 @@
 
 from dolfin import *
 import numpy as np
+import os
 from tqdm import tqdm
 from common import *
 from time import time
 
+from uuid import uuid4
 from sacred import Experiment
 from sacred.observers import MongoObserver
 from sacred import SETTINGS
 
 SETTINGS['CAPTURE_MODE'] = 'no'
 
-ex = Experiment()
+# Careful: using a non-unique experiment name will result in file name
+# collisions for the pvd and vtu files
+ex = Experiment(uuid4().hex[:7])
 
 @ex.config
 def current_config():
@@ -102,7 +106,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
 
     debug = _log.debug
 
-    impl = 'curl-proj-dirichlet' if dirichlet_size >= 0 else 'curl-proj'
+    t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n,
     t = tqdm(total=max_steps, desc='th=% 8.3f' % theta, position=n, dynamic_ncols=True)
     
     MARKER = 1
@@ -162,10 +166,11 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     disp.rename("disp", "displacement")
 
     qform = qform.lower()
-    file_name = make_filename(impl, init, qform, theta, mu)
-    file = File(file_name, "compressed")  # .vtu files will have the same prefix
+    file_path = make_filename(_run.experiment_info['name'], init,
+                              qform, theta, mu)
+    file = File(file_path, "compressed")
 
-    def update_displacements(u, z, step, save):
+    def update_displacements(u, z, save: bool=False, step: int=None):
         compute_potential(z, v, subdomain, MARKER, 0.0)
         fa_w2x.assign(disp.sub(0), u.sub(0))
         fa_w2y.assign(disp.sub(1), u.sub(1))
@@ -191,7 +196,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     w_init = make_initial_data_penalty(init)
     w.interpolate(w_init)
     w_.interpolate(w_init)
-    update_displacements(u, z, 0, save=True)  # Output it too
+    update_displacements(u, z, save=True, step=0)  # Output it too
     
     # Setup forms and energy
     if qform == 'frobenius':
@@ -297,7 +302,9 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         #####
         # Save result into variables for previous timestep and output
         # files and metrics
-        update_displacements(u, z, step, save = step % skip == 0)
+        update_displacements(u, z, save=(step % skip == 0) or
+                                        (step < 100 and step % skip//2 == 0),
+                             step=step)
         
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
@@ -328,13 +335,9 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         t.update()
 
     if save_funs:
-        # FIXME: need to save these in XML format to be able to read back from FEniCS
-        compute_potential(z, v, subdomain, MARKER, 0.0)
-        for s, var in (('disp', disp), ('u', u), ('v', v), ('dtu', du), ('dtz', dz)):
-            new_file_name = file_name[:-4] + '-' + s + '.pvd' # HACK
-            File(new_file_name, "compressed") << (var, 0.0)
-            _run.add_artifact(new_file_name)
-            _run.add_artifact(new_file_name[:-4] + "000000.vtu") # HACK
+        new_file_path = os.path.splitext(file_path)[0] + 'w.xml'
+        File(new_file_path, "compressed") << w
+        _run.add_artifact(new_file_path)
     debug("Done after %d steps" % step)
 
     t.close()

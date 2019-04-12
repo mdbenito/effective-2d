@@ -361,14 +361,18 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
     return isotropic, L2
 
 
-def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -> str:
-    """ Creates a canonical file name and directory from model data.
-    Also creates directories as necessary and appends incremental suffixes in case
-    of name collision.
+def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu: float) -> str:
+    """Creates a canonical file name from model parameters.
+
+    Also creates directories as necessary and appends incremental
+    suffixes in case of name collision.
+
+    FIXME: is this really the behaviour I want?
 
     Parameters
     ---------
-        model: formulation used for the discretization (curl, mixed, ...)
+        experiment_name: unique name defining a collection of runs
+                         (e.g. for multiple values of theta)
         init:  identifier of the initialisation data used
         q2name: name of the quadratic form used
         theta: value of the interpolating parameter
@@ -381,7 +385,7 @@ def make_filename(model: str, init: str, q2name: str, theta: float, mu: float) -
     tries = 0
     while True and tries < 0xFFFFF: # This is an ugly HACK...
         fname_prefix = "%s-%s-%09.4f-%05.2f-%s-" % (init, q2name, theta, mu, suffix)
-        dir = os.path.join("../output/" + model, fname_prefix.strip('-'))
+        dir = os.path.join("../output", experiment_name, fname_prefix.strip('-'))
         try:
             os.makedirs(dir)
             file_name = os.path.join(dir, fname_prefix + ".pvd")

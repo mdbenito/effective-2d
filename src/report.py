@@ -79,7 +79,7 @@ class MongoData(object):
                 ss = floor((tt - hh * 3600 - mm * 60))
                 row_data['time'] = "%02d:%02d:%02d" % (hh, mm, ss)
             except AttributeError:
-                row_data['time'] = "not finished"
+                row_data['time'] = e.status.lower()
             row_data['plot'] = '<a class="plot_one" href="#single_plot_target" ' \
                                + 'data-value="%d" onclick="show_one(this)">Plot</a>' % e.id
             row_data['results'] = '<a href="pvd://%s">%s</a>' % \
@@ -202,8 +202,6 @@ def get_mesh_plot(mesh_file: str):
 @app.route('/api/reload')
 def reload():
     data.load()
-    # HACK in order to tweak the plots on the fly
-    importlib.reload(plots)
     # quite redundant, but jQuery expects something
     response = make_response(json.dumps({'command':'reload', 'status': 'ok'}), 200)
     response.mimetype = 'application/json'

@@ -431,8 +431,9 @@ def recursively_intersect(msh: Mesh, subdomain: FacetFunction,
 # recursively_intersect(msh, subdomain, Point(0,0), 1)
 
 
-def gather_last_timesteps(experiment_folder: str, experiment_name:
-                          str, destination_name: str="auto") -> str:
+def gather_last_timesteps(experiment_folder: str, experiment_name: str,
+                          destination_name: str="auto") -> str:
+
     """ Creates a PVD file out of the last timesteps of a series of runs.
     Parameters
     ----------
@@ -447,27 +448,27 @@ def gather_last_timesteps(experiment_folder: str, experiment_name:
     base_path = os.path.join(experiment_folder, experiment_name)
     timestep = 0
     for run_name in sorted(os.listdir(base_path)):
-        if not os.path.isdir(os.path.join(base_path, run_name)):
+        try:
+            with open(os.path.join(base_path, run_name,
+                                   os.path.basename(run_name) + '--.pvd'),
+                      "rt") as fd:            
+                d = xmltodict.parse(fd.read())
+            if not newd:
+                newd = copy.deepcopy(d)
+                newd['VTKFile']['Collection']['DataSet'] = []
+
+            last_timestep = sorted(d['VTKFile']['Collection']['DataSet'],
+                                   key=lambda x: int(x['@timestep']))[-1]
+            new_timestep = copy.deepcopy(last_timestep)
+            new_timestep['@file'] = os.path.join(run_name, new_timestep['@file'])
+            new_timestep['@timestep'] = str(timestep)
+
+            newd['VTKFile']['Collection']['DataSet'].append(new_timestep)
+            # print("Processed run '%s' with %d timesteps as timestep %d" % 
+            #       (run_name, int(last_timestep['@timestep']), timestep))
+            timestep += 1
+        except (FileNotFoundError, NotADirectoryError):
             continue
-        with open(os.path.join(base_path, run_name,
-                               os.path.basename(run_name) + '--.pvd'),
-                  "rt") as fd:
-            d = xmltodict.parse(fd.read())
-        if not newd:
-            newd = copy.deepcopy(d)
-            newd['VTKFile']['Collection']['DataSet'] = []
-
-        last_timestep = sorted(d['VTKFile']['Collection']['DataSet'],
-                               key=lambda x: int(x['@timestep']))[-1]
-        new_timestep = copy.deepcopy(last_timestep)
-        new_timestep['@file'] = os.path.join(run_name, new_timestep['@file'])
-        new_timestep['@timestep'] = str(timestep)
-
-        newd['VTKFile']['Collection']['DataSet'].append(new_timestep)
-        #print("Processed run '%s' with %d timesteps as timestep %d" % 
-        #           (run_name, int(last_timestep['@timestep']), timestep))
-        timestep += 1
-    
     if destination_name.lower() == "auto":
         destination_name = "full_run-" + experiment_name
     output_filename = os.path.join(base_path, destination_name + '.pvd')

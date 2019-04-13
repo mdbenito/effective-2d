@@ -112,7 +112,7 @@ system (e.g. adding mime types and handlers for xdg-open)
 
 Additionally, the notebooks provide some basic code to query the
 results database and create plots across the range of values of theta
-tested in the experiments. See ...
+tested in the experiments. See `src/explore.ipynb`.
 
 **Disclaimer:** The report server is by far not the _definitive_
 dashboard, but it was fun and quick to do.  The nice jQuery table in

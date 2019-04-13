@@ -50,20 +50,23 @@ To build and start everything, from the root of the project run:
 
 ```
 cd docker && sudo docker-compose -p lvk up
-sudo docker exec -it -u fenics lvk_notebooks_1 bash
 ```
 
-After building, the first command will start four services: MongoDB,
-Omniboard, JupyterLab and the custom results server.
-
-* JupyterLab will be accessible at http://localhost:8888
-* Omniboard will be accessible at http://localhost:9000
-* The custom results server will be at http://localhost:8080
+After building, the first command will start five services: MongoDB,
+Omniboard, JupyterLab, the custom results server and a container to
+run scripts.
 
 **Password and token authentication have been disabled for all
 services!**
 
-The second command will open a shell into one of the containers, with
+* JupyterLab will be accessible at http://localhost:8888
+* Omniboard will be accessible at http://localhost:9000
+* The custom results server will be at http://localhost:8080
+* Access the mongo console with `docker exec -it lvk_mongo_1 mongo`
+* Open a shell to run scripts with `docker exec -it -u fenics
+  lvk_compute_1 bash`
+
+The last command will open a shell into one of the containers, with
 the output and source directories shared for convenience in
 `/home/fenics/lvk`. In particular, this allows local edition of the
 source files which the notebook service sees. You can also open a

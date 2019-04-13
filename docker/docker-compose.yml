@@ -22,7 +22,22 @@ services:
     restart: unless-stopped
     depends_on:
       - mongo
- 
+
+  compute:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    # HACK: run /bin/sh in the background to avoid accidentally
+    # exiting the container
+    command: ["/bin/sh"]
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../output:/home/fenics/lvk/output
+      - ../src:/home/fenics/lvk/src
+    depends_on:
+      - mongo
+
   notebooks:
     build:
       context: ..

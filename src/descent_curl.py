@@ -198,7 +198,25 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
             debug("\tSaving... ", end='')
             file << (disp, float(step))        
             debug("Done.")
-            
+
+    def log_scalars(step, z_, disp, cur_energy, ndu, ndz, alpha):
+        K = project(sym(grad(z_)), T)
+        _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
+        _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
+        _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)            
+
+        _curl = assemble(curl(z_) * dx)
+        _symmetry = symmetry(disp)  # disp is udpated in update_displacements()
+        _run.log_scalar('constraint', _curl)
+        _run.log_scalar('symmetry', _symmetry)
+        debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
+              % (step, cur_energy, _curl, _symmetry))
+
+        _run.log_scalar('J', cur_energy)
+        _run.log_scalar('du', ndu)
+        _run.log_scalar('dz', ndz)
+        _run.log_scalar('alpha', alpha)
+
     bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain,
                       MARKER)
 
@@ -324,34 +342,21 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         #####
         # Save result into variables for previous timestep and output
         # files and metrics
-        if not dry_run:
-            update_displacements(u, z, save=step % skip == 0, step=step)
-            
-            K = project(sym(grad(z_)), T)
-            _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
-            _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
-            _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)            
+        if not dry_run and step % skip == 0:
+            update_displacements(u, z, save=True, step=step)
+            log_scalars(step, z_, disp, cur_energy, ndu, ndz, alpha)
 
-            _curl = assemble(curl(z_) * dx)
-            _symmetry = symmetry(disp)  # disp is udpated in update_displacements()
-            _run.log_scalar('constraint', _curl)
-            _run.log_scalar('symmetry', _symmetry)
-            debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
-                  % (step, cur_energy, _curl, _symmetry))
+        # Use a larger alpha for the next line search
+        alpha = min(1.0, 2.0 * alpha)
 
-            _run.log_scalar('J', cur_energy)
-            _run.log_scalar('du', ndu)
-            _run.log_scalar('dz', ndz)
-            _run.log_scalar('alpha', alpha)
-            
-        alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
         step += 1
         t.update()
 
-    # If we didn't just save, then do it now
+    # If we didn't just save in the last iteration, do it now
     if (step-1) % skip != 0:
         update_displacements(u, z, save=True, step=step)
-    
+        log_scalars(step, z_, disp, cur_energy, ndu, ndz, alpha)
+
     if step < max_steps:
         t.total = step
         t.update()

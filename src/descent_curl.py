@@ -188,7 +188,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
                                   theta, mu)
         file = File(file_path, "compressed")
 
-    def update_displacements(u, z, save: bool=False, step: int=None):
+    def update_displacements(u: Function, z: Function, save: bool,
+                             step: int):
         compute_potential(z, v, subdomain, MARKER, 0.0)
         fa_w2x.assign(disp.sub(0), u.sub(0))
         fa_w2y.assign(disp.sub(1), u.sub(1))
@@ -198,7 +199,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
             file << (disp, float(step))        
             debug("Done.")
             
-    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
+    bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain,
+                      MARKER)
 
     # Solution at time t ("current step")
     w = Function(W)
@@ -214,7 +216,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     w_init = make_initial_data_penalty(init)
     w.interpolate(w_init)
     w_.interpolate(w_init)
-    update_displacements(u, z, step=0)  # Output it too
+    update_displacements(u, z, save=True, step=0)  # Output it too
     
     # Setup forms and energy
     if qform == 'frobenius':

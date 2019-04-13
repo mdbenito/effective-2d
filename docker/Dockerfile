@@ -38,7 +38,6 @@ COPY docker/dot_bashrc_extra /tmp/dot_bashrc_extra
 COPY docker/dot_inputrc $home/.inputrc
 COPY docker/dot_vimrc $home/.vimrc
 COPY docker/fenics-notebook $bin/fenics-notebook
-COPY docker/report-server $bin/report-server
 COPY docker/WELCOME $home/WELCOME
 RUN mkdir -p $src/meshes
 RUN mkdir $home/.jupyter
@@ -49,8 +48,7 @@ COPY docker/jupyter_notebook_config.json $home/.jupyter/
 
 RUN /bin/cat /tmp/dot_bashrc_extra >> $home/.bashrc && \
     rm -f /tmp/dot_bashrc_extra && \
-    chmod 744 $bin/fenics-notebook $bin/report-server && \
-    chown -R fenics.fenics $home/.* $bin/fenics-notebook \
-                           $bin/report-server
+    chmod 744 $bin/fenics-notebook  && \
+    chown -R fenics.fenics $home/.* $bin/fenics-notebook
 
 WORKDIR $home

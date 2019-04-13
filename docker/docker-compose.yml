@@ -13,7 +13,7 @@ services:
       - mongo-data:/data/db
 
   omniboard:
-    image: vivekratnavel/omniboard:1.4.0
+    image: vivekratnavel/omniboard:1.5.0
     command: ["-m", "mongo:27017:lvk"]
     environment:
       - NODE_OPTIONS=--max-old-space-size=4096
@@ -55,7 +55,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: ["flask", "run", "-h", "0.0.0.0", "-p", "8080"]
+    # entrypoint: ["/bin/bash", "-c"]
+    command: ["flask run -h 0.0.0.0 -p 8080"]
     environment:
       - FLASK_APP=/home/fenics/lvk/src/report.py
       - FLASK_ENV=production

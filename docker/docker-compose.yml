@@ -55,9 +55,11 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: ["report-server", "0.0.0.0", "8080"]
+    command: ["flask", "run", "-h", "0.0.0.0", "-p", "8080"]
+    environment:
+      - FLASK_APP=/home/fenics/lvk/src/report.py
+      - FLASK_ENV=production
     volumes:
-      # Need to remove these
       - ../output:/home/fenics/lvk/output
       - ../src:/home/fenics/lvk/src    
     ports:

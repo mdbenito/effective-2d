@@ -1,8 +1,9 @@
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as pl
+from dolfin import plot, norm, Mesh, Vertex, Facet
 
-__all__ = ["plots1", "plots2", "plots3", "plots4", "plot_K"]
+__all__ = ["plot_one", "plots2", "plots3", "plot_many", "plot_K", "plot_mesh"]
 
 
 def running(x, N=5):
@@ -32,15 +33,15 @@ def estimate_win_size(steps: list) -> (int, int):
     return beg, win
 
 
-def plots1(history:dict, _slice=slice(0,-1), running_mean_window=1):
+def plot_one(history: dict, _slice=slice(0,-1), running_mean_window=1):
     h = history
     if running_mean_window is None or _slice is None:
         beg, running_mean_window = estimate_win_size([h['steps']])
         _slice = slice(beg, -1)
 
     pl.figure(figsize=(18,12), )
-    pl.suptitle("'%s', $\\theta = %.3e$, $\mu = %.2e$, $\\epsilon = %.2e$"
-                % (h['init'], h['theta'], h['mu'], h['e_stop']))
+    pl.suptitle("'%s', $\\theta = %.3e$"
+                % (h['init'], h['theta']))
     pl.subplot(3,2,1)
     pl.plot(running(h['du'][_slice], running_mean_window))
     pl.title('$d_{t}u$, window: %d' % running_mean_window)
@@ -62,15 +63,6 @@ def plots1(history:dict, _slice=slice(0,-1), running_mean_window=1):
 
 
 def plots2(history:dict):
-    # Check in case we are imported from report.py, which doesn't
-    # require a dolfin installation and doesn't use this function
-    # anyway
-    try:
-        from dolfin import plot, norm
-    except ImportError:
-        import sys
-        sys.stderr.write("Could not import dolfin.")
-        return        
     h = history
     pl.figure(figsize=(18,18))
     pl.subplot(2,2,1)
@@ -121,7 +113,7 @@ def plots3(run: dict, begin: float = 0.0, end: float = np.inf):
     pl.ylabel("J")
 
 
-def plots4(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
+def plot_many(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
     """
 
     Parameters
@@ -131,10 +123,7 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
     running_mean_window
     """
 
-    if isinstance(runs, filter):
-        _runs = [v for k, v in sorted(runs, key=lambda x: x[1]['theta'])]
-    elif isinstance(runs, dict):
-        _runs = [v for k, v in sorted(runs.items(), key=lambda x: x[1]['theta'])]
+    _runs = sorted(runs, key=lambda x: x['theta'])
 
     if running_mean_window is None or _slice is None:
         beg, running_mean_window = estimate_win_size([r['steps'] for r in _runs])
@@ -177,7 +166,7 @@ def plots4(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
     pl.legend()
 
 
-def plot_K(history:dict, _slice=slice(0,-1), running_mean_window=1):
+def plot_K(history: dict, _slice=slice(0,-1), running_mean_window=1):
     h = history
     if running_mean_window is None or _slice is None:
         beg, running_mean_window = estimate_win_size([h['steps']])
@@ -185,7 +174,7 @@ def plot_K(history:dict, _slice=slice(0,-1), running_mean_window=1):
 
     pl.figure(figsize=(18,12), )
     pl.suptitle("'%s', $\\theta = %.3e$, $\mu = %.2e$, $\\epsilon = %.2e$"
-                % (h['init'], h['theta'], h['mu'], h['e_stop']))
+                % (h['init'], h['theta'], h['mu'], h['e_stop_mult']))
     pl.subplot(2,2,1)
     pl.plot(running(h['Kxx'][_slice], running_mean_window))
     pl.title('$K_{xx}$, window: %d' % running_mean_window)
@@ -207,12 +196,6 @@ def plot_mesh(mesh_file:str) -> None:
     ----------
         mesh_file: Path to a possibly compressed mesh file to read with `Mesh`
     """
-    try:
-        from dolfin import Mesh, plot
-    except ImportError:
-        import sys
-        sys.stderr.write("Could not import dolfin.")
-        return
     msh = Mesh(mesh_file)
     numvertices = msh.geometry().num_vertices()
     pl.figure(figsize=(12,12))
@@ -227,12 +210,6 @@ def plot_nodes_in_subdomain(subdomain, marker):
         subdomain: a `FacetFunction` over a mesh.
         marker: the value that facets of interest have.
     """
-    try:
-        from dolfin import plot, Vertex, Facet
-    except ImportError:
-        import sys
-        sys.stderr.write("Could not import dolfin.")
-        return
     msh = subdomain.mesh()
     pl.figure(figsize=(10, 10))
     plot(msh)

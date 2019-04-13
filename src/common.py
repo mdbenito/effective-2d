@@ -323,7 +323,8 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
         n: number of refinements for generation.
 
     """
-    mesh_file = '../meshes/mesh-%dx%d-%s.xml.gz' % (m, n, kind)
+    mesh_file = os.path.join('..', 'meshes',
+                             'mesh-%dx%d-%s.xml.gz' % (m, n, kind))
 
     if not os.path.isfile(mesh_file):
         if kind.lower() == 'circle':

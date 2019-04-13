@@ -1,323 +1,252 @@
 #!/usr/bin/env python3
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from collections import OrderedDict
 import json
 import io
-import re
-import shutil
-import importlib
-import plots
-import matplotlib.pyplot as pl
-import pickle as pk
-from math import floor, log10
-import binascii
 import os
+import importlib
+import binascii
+import matplotlib.pyplot as pl
+from math import floor, log10
+from plots import plot_one, plot_many, plot_mesh
+from incense import ExperimentLoader
+from common import generate_mesh, make_filename
+from dolfin import Mesh
+from typing import Union, List
+from flask import Flask, render_template, make_response, Response
 
 
-class PickleData(object):
-    """ A simple interface around the dict of results with all runs.
-
-    Data is stored in a pickle, so it is necessarily written only in
-    bulk with save(). This is slow and can cause data loss if the server
-    writes at the same time that some simulation does, for instance.
-    TODO: ditch this and use some database.
-    TODO: templatize the format of row data (css classes etc.)
+class MongoData(object):
+    """ A simple interface around the mongo database of results.
+    FIXME: This is naive and loads all data at once!
     """
-    def __init__(self, filename):
-        super().__init__()
-        self.results_file = filename
-        self._results = {}
+    def __init__(self, mongo_uri: str, db_name: str):
+        self._loader = ExperimentLoader(mongo_uri=mongo_uri, db_name=db_name)
+        self._experiments = None
         self.load()
 
     def load(self):
-        try:
-            print("Loading database... ", end='')
-            with open(self.results_file, "rb") as fd:
-                results = pk.load(fd)
-            print("done.")
-            self._results = OrderedDict(sorted(results.items(), key=lambda x: x[1]['theta']))
-        except FileNotFoundError:
-            print("ERROR: results file '%s' not found" % self.results_file)
-            exit(1)
+        self._experiments = self._loader.find({})
 
-    def __getitem__(self, item_s):
-        if isinstance(item_s, str):
-            return self._results.get(item_s, {})
-        elif isinstance(item_s, list):
-            return {k: v for k, v in self._results.items() if k in item_s}
-        else:
-            return None
-
-    def save(self):
-        """ Dump all of the data back into the pickle.
-        TODO: don't convert back to dict upon saving?
-        """
-        try:
-            print("Saving database... ", end='')
-            with open(self.results_file, "wb") as fd:
-                pk.dump(dict(self._results), fd)
-            print("done.")
-        except Exception as e:  # Pokemon!
-            print("ERROR: " + str(e))
-
-    def delete(self, item):
-        """ Deletes one item from the store.
-        Remember that the data is not saved to disk unless save() is called.
-        """
-        try:
-            # from sys import stderr
-            # stderr.write("Would delete: " + item)
-            del self._results[item]
-            return item
-        except KeyError:
-            return None
+    def __getitem__(self, exp_id: Union[str, int]):
+        # Should be cached by incense...
+        return self._loader.find_by_id(int(exp_id))
 
     def columns(self):
         """ Returns a json string with the colum data for footable. """
-        cols = [{'name': 'impl', 'title': 'Impl.'},
+        cols = [{'name': 'exp_name', 'title': 'Experiment'},
                 {'name': 'form_name', 'title': 'Q2'},
                 {'name': 'init', 'title': 'Initial data'},
                 {'name': 'theta', 'title': 'theta', 'type': 'number'},
                 {'name': 'mu', 'title': 'mu', 'type': 'number'},
                 {'name': 'e_stop', 'title': 'eps order', 'type': 'number'},
-                {'name': 'steps', 'title': 'Steps', 'type': 'number', 'filterable': False},
+                # {'name': 'steps', 'title': 'Steps', 'type': 'number', 'filterable': False},
                 {'name': 'time', 'title': 'Duration', 'type': 'time', 'filterable': False},
                 {'name': 'plot', 'title': '', 'type': 'html', 'filterable': False},
                 {'name': 'results', 'type': 'html', 'breakpoints': 'all',
                  'title': 'results file:', 'filterable': False},
-                {'name': 'form_arguments', 'breakpoints': 'all',
-                 'title': 'form arguments:', 'filterable': False},
                 {'name': 'mesh', 'title': 'Mesh file', 'breakpoints': 'all'},
                 {'name': 'select', 'title': '', 'filterable': False}]
         return json.dumps(cols)
 
     def rows(self):
         """ Returns a json dict with the row data for footable. """
-        def toggle_button(id:str) -> str:
-            input = '<input class="tgl tgl-flat" id="%s" type="checkbox"/>' % id
-            label = '<label class="tgl-btn" for="%s"></label>' % id
-            return input+label
+        def toggle_button(exp_id: str) -> str:
+            form_input = '<input class="tgl tgl-flat" id="%d" type="checkbox"/>' % exp_id
+            form_label = '<label class="tgl-btn" for="%d"></label>' % exp_id
+            return form_input + form_label
 
         ret = []
-        for key, row in self._results.items():
-            row_data = {col: val for col, val in row.items()
-                        if col in ('impl', 'init', 'steps')}
-            row_data['theta'] = round(row['theta'], 3)
-            row_data['mu'] = round(row['mu'], 2)
-            # HACK: *sometimes* data are stored in numpy formats, which json.dumps()
-            # cannot handle. With item() we convert them to native python types.
+        for e in self._experiments:
+            conf = e.config
+            mesh_file = generate_mesh(conf.mesh_type, conf.mesh_m, conf.mesh_n)
+            msh = Mesh(mesh_file)
+            mu = conf.mu_scale / msh.hmin()**conf.hmin_power
+            file_name = make_filename(e.experiment.name, conf.theta, mu, makedir=False)
+            
+            row_data = {}
+            row_data['exp_name'] = e.experiment.name
+            row_data['form_name'] = conf.qform
+            row_data['init'] = conf.init
+            # row_data['steps'] = e....?
+            row_data['theta'] = round(conf.theta, 3)
+            row_data['mu'] = round(mu, 2)
+            row_data['e_stop'] = int(log10(conf.e_stop_mult)) - 1
             try:
-                row_data['theta'] = row_data['theta'].item()
-                row_data['mu'] = row_data['mu'].item()
+                tt = (e.stop_time - e.start_time).seconds
+                hh = floor(tt / 3600)
+                mm = floor((tt - hh * 3600) / 60)
+                ss = floor((tt - hh * 3600 - mm * 60))
+                row_data['time'] = "%02d:%02d:%02d" % (hh, mm, ss)
             except AttributeError:
-                pass
-            tt = max(0, row.get('time', 0))
-            hh = floor(tt / 3600)
-            mm = floor((tt - hh * 3600) / 60)
-            ss = floor((tt - hh * 3600 - mm * 60))
-            row_data['time'] = "%02d:%02d:%02d" % (hh, mm, ss)
-            row_data['form_name'] = row.get('Q2', {}).get('form_name', 'N/A')
-            row_data['e_stop'] = int(log10(row.get('e_stop', 1))) - 1
+                row_data['time'] = "not finished"
             row_data['plot'] = '<a class="plot_one" href="#single_plot_target" ' \
-                               + 'data-value="%s" onclick="show_one(this)">Plot</a>' % key
-            mesh_file = row.get('mesh', '')
+                               + 'data-value="%d" onclick="show_one(this)">Plot</a>' % e.id
+            row_data['results'] = '<a href="pvd://%s">%s</a>' % \
+                                  (file_name, os.path.basename(file_name))
             row_data['mesh'] = '<a class="plot_one" href="#single_plot_target" ' \
-                               + 'data-value="%s" onclick="show_mesh(this)">%s</a>' % (mesh_file, mesh_file)
-            file_name = os.path.join(os.getcwd(), row.get('file_name', 'UNAVAILABLE'))
-            row_data['results'] = '<a href="pvd://%s">%s</a>' % (file_name, os.path.basename(file_name))
-            row_data['form_arguments'] = ", ".join("%s: %f" % (k, v) for k, v in
-                                                    row.get('Q2', {}).get('arguments', {}).items())
-            row_data['select'] = toggle_button(key)
+                               + 'data-value="%s" onclick="show_mesh(this)">%s</a>' % \
+                               (mesh_file, os.path.basename(mesh_file))
+            row_data['select'] = toggle_button(e.id)
             ret.append(row_data)
 
         return json.dumps(ret)
 
 
-class Handler(BaseHTTPRequestHandler):
-    """
-    GET API:
-      /columns
-      /rows
-      /plot_one/[key]
-      /plot_multiple/key[,key]*
-      /reload
-      /delete/key[,key]*
+# Disable interactive plots
+pl.ioff()
 
-    ****************************************************************************
-    CAREFUL: delete is NOT SAFE!! There are a couple of obvious checks but they
-    can probably be circumvented
-    ****************************************************************************
-    """
-
-    def _set_headers(self, *args, content='application/json', charset='utf8'):
-        self.send_response(*args)
-        self.send_header('Content-type', content)
-        self.send_header('charset', charset)
-        self.end_headers()
-
-    def _image_headers(self):
-        self.send_response(200)
-        self.send_header('Pragma', 'public')
-        self.send_header("Pragma-directive", "no-cache")
-        self.send_header("Cache-directive", "no-cache")
-        self.send_header("Cache-control", "no-cache")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
-        # self.send_header('Expires', gmdate('D, d M Y H:i:s \G\M\T', time() + 86400));
-        self.send_header('Content-Type', 'image/png')
-        self.end_headers()
-
-    def do_GET(self):
-        """ Answers GET requests. """
-
-        # Emtpy paths lead to /index.html
-        if self.path in ("", "/"):
-            self.path = "/index.html"
-        if re.match('/(css/.*|js/.*|fonts/.*|index.*|favicon.*.ico)', self.path) is not None:
-            mimetypes = {
-                "html": "text/html",
-                "js": "text/javascript",  # I guess these two are wrong but who cares
-                "css": "text/css",
-                "eot": "application/vnd.ms",
-                "otf": "application/font-sfnt",
-                "svg": "image/svg+xml",
-                "ttf": "application/font-sfnt",
-                "woff": "application/font-woff",
-                "woff2": "font/woff2",
-                "ico": "image/x-icon"}
-            fname = self.path.split('?')[0]  # ignore url arguments
-            with open("assets/" + fname.lstrip('/'), "rb") as fd:
-                #self.log_message("Serving file: %s" % fname)
-                extension = self.path[self.path.rfind('.')+1:]
-                self._set_headers(200, content=mimetypes.get(extension, "text/plain"))
-                shutil.copyfileobj(fd, self.wfile)
-
-        elif self.path.endswith('/api/reload'):
-            data.load()
-            # HACK in order to tweak the plots on the fly
-            importlib.reload(plots)
-            self._set_headers(200)
-            # quite redundant, but jQuery expects something
-            self.wfile.write(bytes(json.dumps({'command':'reload', 'status': 'ok'}), 'utf-8'))
-
-        elif self.path.endswith('/api/columns'):
-            self._set_headers(200)
-            self.wfile.write(bytes(data.columns(), 'utf-8'))
-
-        elif self.path.endswith('/api/rows'):
-            self._set_headers(200)
-            self.wfile.write(bytes(data.rows(), 'utf-8'))
-
-        elif re.match('/api/plot_one/', self.path) is not None:
-            key = self.path.split('/')[-1]
-            if data[key] is not None:
-                with io.BytesIO() as buf:
-                    try:
-                        plots.plots1(data[key], None, None)
-                        pl.savefig(buf, format='png')
-                        pl.close()
-                        buf.seek(0)
-                        self._image_headers()
-                        shutil.copyfileobj(buf, self.wfile)
-                    except Exception as e:
-                        self._set_headers(400, 'Error: %s' % str(e))
-            else:
-                self.send_error(400, 'Bad Request: run "%s" does not exist' %
-                                     key)
-
-        elif re.match('/api/plot_mesh/', self.path) is not None:
-            mesh_file = self.path.split('/')[-1]
-            with io.BytesIO() as buf:
-                try:
-                    plots.plot_mesh(mesh_file)
-                    pl.savefig(buf, format='png')
-                    pl.close()
-                    buf.seek(0)
-                    self._image_headers()
-                    shutil.copyfileobj(buf, self.wfile)
-                except Exception as e:
-                    self._set_headers(400, 'Error: %s' % str(e))
-
-        elif re.match('/api/plot_multiple/', self.path) is not None:
-            ids = self.path.split('/')[-1].split(',')
-
-            with io.BytesIO() as buf:
-                try:
-                    plots.plots4(data[ids], None, None)
-                    pl.savefig(buf, format='png')
-                    pl.close()
-                    buf.seek(0)
-                    self._image_headers()
-                    b64 = binascii.b2a_base64(buf.getvalue())
-                    shutil.copyfileobj(io.BytesIO(b64), self.wfile)
-                except Exception as e:
-                    self.send_error(400, "Error: %s" % str(e))
-
-        elif re.match('/api/delete/', self.path) is not None:
-            ids = self.path.split('/')[-1].split(',')
-            deleted = []
-            for id in ids:
-                files_deleted = 0
-                dir, file = os.path.split(data[id].get('file_name', ''))
-                try:
-                    # Be extra careful: a "safe" path to delete is not
-                    # absolute and contains only vtu and pvd files
-                    if not os.path.isabs(dir) and dir != "":
-                        dir = os.path.join(os.getcwd(), dir)
-                        for f in os.listdir(dir):
-                            _, ext = os.path.splitext(f)
-                            if ext in ('.pvd', '.vtu'):
-                                os.unlink(os.path.join(dir, f))
-                                files_deleted += 1
-                                # self.log_message("unlink: %s" % os.path.join(dir, f))
-                        if files_deleted > 0:
-                            os.rmdir(dir)
-                    tmp = data.delete(id)
-                    deleted.append(tmp)
-                    if tmp:
-                        self.log_message("Deleted item '%s' and %d files" %
-                                         (id, files_deleted))
-                except Exception as e:
-                    self.log_error("%s [%s, %s]" % (str(e), dir, file))
-                    # TODO: report errors?
-            # Save if there was at least one deletion
-            for id in deleted:
-                if id is not None:
-                    data.save()
-                    break
-            self._set_headers(200)
-            json.dumps(deleted)
-        else:
-            # self.log_error("Unknown API call: '%s'" % self.path)
-            self.send_error(403, "Unknown API call: '%s'" % self.path)
-
-    def do_HEAD(self):
-        self._set_headers()
-
-    def do_POST(self):
-        #self.log_error("Unhandled POST API call: '%s'" % self.path)
-        self.send_error(403, "Unhandled POST API call: '%s'" % self.path)
+data = MongoData('mongo:27017', 'lvk')
+app = Flask(__name__)
 
 
-def run(server_class=HTTPServer, handler_class=Handler, ip='localhost', port=8080):
-    httpd = server_class((ip, port), handler_class)
-    print('Starting server at http://%s:%d' % (ip, port))
-    httpd.serve_forever()
+def set_image_headers(response: Response):
+    response.headers['Pragma'] = 'public'
+    response.headers['Pragma-directive'] = "no-cache"
+    response.headers['Cache-directive'] = "no-cache"
+    response.headers['Cache-control'] = "no-cache"
+    response.headers['Pragma'] = "no-cache"
+    response.headers['Expires'] = "0"
+    # response.headers['Expires'] = gmdate('D, d M Y H:i:s \G\M\T', time() + 86400))
+    response.mimetype = 'image/png'
+
+    
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 
-if __name__ == "__main__":
-    from sys import argv
+@app.route('/api/rows')
+def get_rows():
+    response = make_response(data.rows(), 200)
+    response.mimetype = 'application/json'
+    return response
 
-    # Disable interactive plots
-    pl.ioff()
 
-    # HACK: replace with DB connection
-    data = PickleData('results-combined.pickle')
+@app.route('/api/columns')
+def get_columns():
+    response = make_response(data.columns(), 200)
+    response.mimetype = 'application/json'
+    return response
 
-    if len(argv) == 2:
-        run(port=int(argv[1]))
-    elif len(argv) == 3:
-        run(ip=argv[1], port=int(argv[2]))
-    else:
-        run()
+
+def prepare_plot(b64: bool=False):
+    with io.BytesIO() as buf:
+        pl.savefig(buf, format='png')
+        pl.close()
+        buf.seek(0)
+        if b64:
+            buf = io.BytesIO(binascii.b2a_base64(buf.getvalue()))
+        response = make_response(buf.getvalue())
+        set_image_headers(response)
+    return response
+
+
+@app.route('/api/plot_one/<int:exp_id>')
+def get_single_plot(exp_id: int):
+    try:
+        e = data[exp_id]
+        metrics = e.metrics
+        metrics.update({'init': e.config.init, 'theta': e.config.theta,
+                        'steps': len(metrics['J'])})
+        plot_one(metrics, None, None)
+        response = prepare_plot()
+    except IndexError as e:
+        out = render_template('error.html', type=400,
+                              msg='Run %d does not exist' % exp_id)
+        response = make_response(out, 400)
+    except Exception as e:
+        response = make_response(render_template('error.html', type=400,
+                                                 msg=str(e)),
+                                 400)
+    return response
+
+
+@app.route('/api/plot_multiple/<string:experiment_ids>')
+def get_multiple_plots(experiment_ids: str):
+    experiments = [data[int(exp_id)] for exp_id in experiment_ids.split(',')]
+    try:
+        metrics = [e.metrics for e in experiments]
+        for e, m in zip(experiments, metrics):
+            m.update({'init': e.config.init, 'theta': e.config.theta,
+                      'steps': len(m['J'])})
+        plot_many(metrics, None, None)
+        response = prepare_plot(b64=True)
+    except IndexError as e:
+        out = render_template('error.html', type=400,
+                              msg='Run "%s" does not exist' % key)
+        response = make_response(out, 400)
+    except Exception as e:
+        response = make_response(render_template('error.html', type=400,
+                                                 msg=str(e)),
+                                 400)
+    return response
+
+
+@app.route('/api/meshes/<string:mesh_file>')
+def get_mesh_plot(mesh_file: str):
+    try:
+        # FIXME: should use generate_mesh() here too
+        plot_mesh(os.path.join('..', 'meshes', mesh_file))
+        response = prepare_plot()
+    except IndexError as e:
+        out = render_template('error.html', type=400,
+                              msg='Mesh "%s" does not exist' % mesh_file)
+        response = make_response(out, 400)
+    except Exception as e:
+        response = make_response(render_template('error.html', type=400,
+                                                 msg=str(e)), 400)
+    return response
+
+
+@app.route('/api/reload')
+def reload():
+    data.load()
+    # HACK in order to tweak the plots on the fly
+    importlib.reload(plots)
+    # quite redundant, but jQuery expects something
+    response = make_response(json.dumps({'command':'reload', 'status': 'ok'}), 200)
+    response.mimetype = 'application/json'
+    return response
+
+
+@app.route('/api/delete/<string:experiment_ids>')
+def delete(experiment_ids: str):
+    experiment_ids = list(map(int, experiment_ids.split(',')))
+    deleted = []
+    for e in [data[exp_id] for exp_id in experiment_ids]:
+        files_deleted = 0
+        msh = Mesh(generate_mesh(e.config.mesh_type, e.config.mesh_m,
+                                 e.config.mesh_n))
+        mu = e.config.mu_scale / msh.hmin()**e.config.hmin_power
+        filename = make_filename(e.experiment.name, e.config.theta,
+                                 mu, makedir=False)
+        dir, file = os.path.split(filename)
+        try:
+            # Be extra careful: a "safe" path to delete is not
+            # absolute and contains only vtu and pvd files
+            if not os.path.isabs(dir) and dir != "":
+                dir = os.path.join(os.getcwd(), dir)
+                for f in os.listdir(dir):
+                    _, ext = os.path.splitext(f)
+                    if ext in ('.pvd', '.vtu'):
+                        os.unlink(os.path.join(dir, f))
+                        files_deleted += 1
+                        # self.log_message("unlink: %s" % os.path.join(dir, f))
+                if files_deleted > 0:
+                    os.rmdir(dir)
+            tmp = data.delete(id)
+            if tmp:
+                deleted.append(tmp)
+                app.logger.info("Deleted item '%s' and %d files" %
+                                (id, files_deleted))
+        except Exception as e:
+            app.logger.error("%s [%s, %s]" % (str(e), dir, file))
+            # TODO: report errors?
+
+    # Save if there was at least one deletion
+    if deleted:
+        data.save()
+    response = make_response(json.dumps(deleted), 200)
+    response.mimetype = 'application/json'
+    return response
+

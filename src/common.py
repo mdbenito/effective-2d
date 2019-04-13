@@ -361,7 +361,8 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
     return isotropic, L2
 
 
-def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu: float) -> str:
+def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu: float,
+                  makedir: bool=True) -> str:
     """Creates a canonical file name from model parameters.
 
     Also creates directories as necessary and appends incremental
@@ -377,6 +378,7 @@ def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu
         q2name: name of the quadratic form used
         theta: value of the interpolating parameter
         mu: penalty coefficient
+        makedir: whether to create the necessary path to the destination file
     Returns
     -------
         Full path to PVD file.
@@ -387,7 +389,8 @@ def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu
         fname_prefix = "%s-%s-%09.4f-%05.2f-%s-" % (init, q2name, theta, mu, suffix)
         dir = os.path.join("../output", experiment_name, fname_prefix.strip('-'))
         try:
-            os.makedirs(dir)
+            if makedir:
+                os.makedirs(dir)
             file_name = os.path.join(dir, fname_prefix + ".pvd")
             return file_name
         except FileExistsError:

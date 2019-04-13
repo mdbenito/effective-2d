@@ -179,12 +179,15 @@ see the output:
 
 * Running `descent_*.py` with multiprocessing will often result in
   dolfin's JIT compiler throwing strange I/O errors and jobs failing.
-  Typically, relaunching will solve the issue since forms will be read
-  from disk. However, the cache sometimes gets corrupted. The easiest
-  workaround is to exit the container and start a new one. Because of
-  these problems, it might pay off to do a first run with low max
-  steps so as to be sure to have all forms precompiled for the real
-  run.
+  This seems to be caused by multiple jobs writing to the cache and
+  relaunching will typically solve the issue since forms will be read
+  from disk. For this reason, there is a "dry run" mode which does not
+  create any db entry nor files but does the precompilation of all
+  required forms. Just run `python3 descent_curl.py parallel with
+  dry_run=True` and wait until actual computation starts, then kill
+  the job and restart without the `dry_run` parameter. However,
+  sometimes the cache gets corrupted and it must be deleted (it is in
+  `~/.cache/dijitso` and `~/.cache/instant`).
 * `docker-compose` can fail to start the network under Windows systems
   with messages like `driver failed programming external connectivity
   on endpoint` or `network not found`. If this happens, try restarting

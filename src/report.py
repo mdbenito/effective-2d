@@ -249,3 +249,7 @@ def delete(experiment_ids: str):
     response.mimetype = 'application/json'
     return response
 
+
+@app.errorhandler(404)
+def page_not_found(e):
+  return render_template('error.html', type=404, msg="Page not found"), 404

@@ -25,6 +25,7 @@ class MongoData(object):
         self.load()
 
     def load(self):
+        self._loader.cache_clear()
         self._experiments = self._loader.find({})
 
     def __getitem__(self, exp_id: Union[str, int]):

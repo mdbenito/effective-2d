@@ -6,7 +6,7 @@ tqdm==4.31.1
 nbimporter==0.3.1
 autograd==1.2
 pymongo==3.7.2
-incense==0.0.7
+incense==0.0.8
 jupyterlab==0.35.4        
 jupyterlab-server==0.2.0 
 matplotlib==3.0.3

@@ -10,3 +10,4 @@ incense==0.0.7
 jupyterlab==0.35.4        
 jupyterlab-server==0.2.0 
 matplotlib==3.0.3
+xmltodict==0.12.0

@@ -5,6 +5,8 @@ import pickle as pk
 import mshr
 import uuid
 from typing import List
+import xmltodict
+import copy
 
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty",
@@ -12,7 +14,7 @@ __all__ = ["make_initial_data_mixed", "make_initial_data_penalty",
            "center_function", "compute_potential", "load_results",
            "save_results", "generate_mesh", "eps",
            "symmetrise_gradient", "frobenius_form", "isotropic_form",
-           "make_filename", "recursively_intersect"]
+           "make_filename", "recursively_intersect", "gather_last_timesteps"]
 
 
 def make_initial_data_mixed(which: str, degree=2) -> Expression:
@@ -418,7 +420,51 @@ def recursively_intersect(msh: Mesh, subdomain: FacetFunction,
             v = Vertex(msh, vidx)
             if recurr > 0:
                 recursively_intersect(msh, subdomain, v.point(), mark, recurr=recurr - 1)
-
+                
 # msh = Mesh(mesh_file)
 # subdomain = FacetFunction("uint", msh, 0)
 # recursively_intersect(msh, subdomain, Point(0,0), 1)
+
+
+def gather_last_timesteps(experiment_folder: str, experiment_name:
+                          str, destination_name: str="auto") -> str:
+    """ Creates a PVD file out of the last timesteps of a series of runs.
+    Parameters
+    ----------
+        experiment_folder: Typically '../output'
+        experiment_name: The unique identifier for the experiment,
+                         e.g. 'bf327ac'
+    Returns
+    -------
+        Path to the generated PVD file
+    """
+    newd = None
+    base_path = os.path.join(experiment_folder, experiment_name)
+    timestep = 0
+    for run_name in sorted(os.listdir(base_path)):
+        if not os.path.isdir(os.path.join(base_path, run_name)):
+            continue
+        with open(os.path.join(base_path, run_name,
+                               os.path.basename(run_name) + '--.pvd')) as fd:
+            d = xmltodict.parse(fd.read())
+        if not newd:
+            newd = copy.deepcopy(d)
+            newd['VTKFile']['Collection']['DataSet'] = []
+
+        last_timestep = sorted(d['VTKFile']['Collection']['DataSet'],
+                               key=lambda x: x['@timestep'])[-1]
+        new_timestep = copy.deepcopy(last_timestep)
+        new_timestep['@file'] = os.path.join(run_name, new_timestep['@file'])
+        new_timestep['@timestep'] = str(timestep)
+
+        newd['VTKFile']['Collection']['DataSet'].append(new_timestep)
+        #print("Processed run '%s' with %d timesteps as timestep %d" % 
+        #           (run_name, int(last_timestep['@timestep']), timestep))
+        timestep += 1
+    
+    if destination_name.lower() == "auto":
+        destination_name = "full_run-" + experiment_name
+    output_filename = os.path.join(base_path, destination_name + '.pvd')
+    with open(output_filename, "wt") as fd:
+        fd.write(xmltodict.unparse(newd, pretty=True, short_empty_elements=True))
+        return output_filename

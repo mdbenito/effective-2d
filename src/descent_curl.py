@@ -67,8 +67,9 @@ def current_config():
     max_line_search_steps = 20
     max_steps = 18000
     skip = 20 if theta < 20 else 40
-    save_funs = False
+    save_funs = True
     n = 0
+    dry_run = False
 
 @ex.main
 def run_model(_log, _run, init: str, qform: str, mesh_type: str,
@@ -77,7 +78,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
               deg: int = 1, projection: bool = False, e_stop_mult:
               float = 1e-5, omega: float = 0.25,
               max_line_search_steps: int = 20, max_steps: int = 1000,
-              skip: int = 10, save_funs: bool = True, n: int=0):
+              skip: int = 10, save_funs: bool = True, n: int=0,
+              dry_run: bool = False):
     """ Computes minimal energy with penalty term using (projected)
     gradient descent
 
@@ -109,7 +111,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         debug_fun: set to noop or print
         n: index of run in a parallel computation for the displaying of progress
             bars
-
+        dry_run: set to True to disable saving of results and metrics
+                 (useful as a workaround to the problem with initial parallel runs)
     """  
     set_log_level(ERROR)  # shut fenics up
 
@@ -175,22 +178,26 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     fa_v2z = FunctionAssigner(P.sub(2), V)
     disp = Function(P)
     disp.rename("disp", "displacement")
-
+    # FIXME: this shouldn't be necessary!! (but circular_symmetry()
+    # fails without it)
+    disp.set_allow_extrapolation(True)
+    
     qform = qform.lower()
-    file_path = make_filename(_run.experiment_info['name'], init,
-                              qform, theta, mu)
-    file = File(file_path, "compressed")
+    if not dry_run:
+        file_path = make_filename(_run.experiment_info['name'],
+                                  theta, mu)
+        file = File(file_path, "compressed")
 
     def update_displacements(u, z, save: bool=False, step: int=None):
         compute_potential(z, v, subdomain, MARKER, 0.0)
         fa_w2x.assign(disp.sub(0), u.sub(0))
         fa_w2y.assign(disp.sub(1), u.sub(1))
         fa_v2z.assign(disp.sub(2), v)
-        if save:
+        if save and not dry_run:
             debug("\tSaving... ", end='')
             file << (disp, float(step))        
             debug("Done.")
-     
+            
     bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
 
     # Solution at time t ("current step")
@@ -207,7 +214,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     w_init = make_initial_data_penalty(init)
     w.interpolate(w_init)
     w_.interpolate(w_init)
-    update_displacements(u, z, save=True, step=0)  # Output it too
+    update_displacements(u, z, step=0)  # Output it too
     
     # Setup forms and energy
     if qform == 'frobenius':
@@ -255,7 +262,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
 
     domain_area = assemble(1*dx(msh))
     
-    while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:    
+    while alpha * (ndu ** 2 + ndz ** 2) > e_stop and step < max_steps and not fail:
         #####
         # Compute gradient update
         # XXX: for some reason I'm not able to use derivative(J, w_, dtw)
@@ -309,34 +316,35 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
             # HACK: go back to functions over subspaces
             u, z = w.split()
 
-        #####
-        # Save result into variables for previous timestep and output
-        # files and metrics
-        update_displacements(u, z, save=(step % skip == 0) or
-                                        (step < 100 and step % skip//2 == 0),
-                             step=step)
-        
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
 
-        K = project(sym(grad(z_)), T)
-        _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
-        _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
-        _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)            
+        #####
+        # Save result into variables for previous timestep and output
+        # files and metrics
+        if not dry_run:
+            update_displacements(u, z, save=(step % skip == 0) or
+                                            (step < 100 and step % skip//2 == 0),
+                                 step=step)
+            
+            K = project(sym(grad(z_)), T)
+            _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
+            _run.log_scalar('Kxy', assemble(K[0,1]*dx)/domain_area)
+            _run.log_scalar('Kyy', assemble(K[1,1]*dx)/domain_area)            
 
-        _curl = assemble(curl(z_) * dx)
-        _symmetry = symmetry(disp)  # disp is udpated in update_displacements()
-        _run.log_scalar('constraint', _curl)
-        _run.log_scalar('symmetry', _symmetry)
-        debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
-              % (step, cur_energy, _curl, _symmetry))
+            _curl = assemble(curl(z_) * dx)
+            _symmetry = symmetry(disp)  # disp is udpated in update_displacements()
+            _run.log_scalar('constraint', _curl)
+            _run.log_scalar('symmetry', _symmetry)
+            debug("Step %d, energy = %.3e, curl = %.3e, symmetry = %.3f"
+                  % (step, cur_energy, _curl, _symmetry))
 
-        _run.log_scalar('J', cur_energy)
-        _run.log_scalar('du', ndu)
-        _run.log_scalar('dz', ndz)
-        _run.log_scalar('alpha', alpha)
+            _run.log_scalar('J', cur_energy)
+            _run.log_scalar('du', ndu)
+            _run.log_scalar('dz', ndz)
+            _run.log_scalar('alpha', alpha)
+            
         alpha = min(1.0, 2.0 * alpha)  # Use a larger alpha for the next line search
-        
         step += 1
         t.update()
 
@@ -344,7 +352,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         t.total = step
         t.update()
 
-    if save_funs:
+    if save_funs and not dry_run:
         new_file_path = os.path.splitext(file_path)[0] + 'w.xml'
         File(new_file_path, "compressed") << w
         _run.add_artifact(new_file_path)
@@ -363,7 +371,7 @@ def job(config_updates: dict):
     experiences.
     """
 
-    if not ex.observers:
+    if not config_updates['dry_run'] and not ex.observers:
         ex.observers.append(MongoObserver.create(url='mongo:27017',
                                                  db_name='lvk'))
     r = ex.run(config_updates=config_updates)
@@ -371,7 +379,7 @@ def job(config_updates: dict):
 
 
 @ex.command(unobserved=True) # Do not create a DB entry for this launcher
-def parallel(max_jobs: int=18, theta_values: list=None,
+def parallel(max_jobs: int=12, theta_values: list=None, dry_run: bool=False,
              extra_args: dict=None):
     """Runs a number of experiments in parallel.
 
@@ -396,7 +404,8 @@ def parallel(max_jobs: int=18, theta_values: list=None,
 
     n_jobs = min(max_jobs, len(theta_values))
     with futures.ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        tasks = [executor.submit(job, dict(extra_args, n=n%max_jobs, theta=theta))
+        tasks = [executor.submit(job, dict(extra_args, dry_run=dry_run,
+                                           n=n%max_jobs, theta=theta))
                  for n, theta in enumerate(theta_values)]
         for future in futures.as_completed(tasks):
             print(future.result())

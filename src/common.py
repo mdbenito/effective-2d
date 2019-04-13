@@ -361,21 +361,16 @@ def isotropic_form(lambda_lame=1, mu_lame=1):
     return isotropic, L2
 
 
-def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu: float,
+def make_filename(experiment_name: str, theta: float, mu: float,
                   makedir: bool=True) -> str:
     """Creates a canonical file name from model parameters.
 
-    Also creates directories as necessary and appends incremental
-    suffixes in case of name collision.
-
-    FIXME: is this really the behaviour I want?
+    Also creates directories as necessary
 
     Parameters
     ---------
         experiment_name: unique name defining a collection of runs
                          (e.g. for multiple values of theta)
-        init:  identifier of the initialisation data used
-        q2name: name of the quadratic form used
         theta: value of the interpolating parameter
         mu: penalty coefficient
         makedir: whether to create the necessary path to the destination file
@@ -383,19 +378,11 @@ def make_filename(experiment_name: str, init: str, q2name: str, theta: float, mu
     -------
         Full path to PVD file.
     """
-    suffix = ""
-    tries = 0
-    while True and tries < 0xFFFFF: # This is an ugly HACK...
-        fname_prefix = "%s-%s-%09.4f-%05.2f-%s-" % (init, q2name, theta, mu, suffix)
-        dir = os.path.join("../output", experiment_name, fname_prefix.strip('-'))
-        try:
-            if makedir:
-                os.makedirs(dir)
-            file_name = os.path.join(dir, fname_prefix + ".pvd")
-            return file_name
-        except FileExistsError:
-            suffix = uuid.uuid4().hex[:5]
-            continue
+    basename = "%09.4f-%05.2f" % (theta, mu)
+    dir = os.path.join("../output", experiment_name, basename)
+    if makedir:
+        os.makedirs(dir)
+    return os.path.join(dir, basename + "-.pvd")
 
 
 def recursively_intersect(msh: Mesh, subdomain: FacetFunction,

@@ -74,7 +74,7 @@ def run_model(init: str, qform: str, mesh_file: str, theta: float, mu: float = 1
 
     bcW = DirichletBC(W, Constant((0.0, 0.0, 0.0, 0.0, 0.0)), subdomain, MARKER)
 
-    file_name = make_filename(impl, init, qform, theta, mu)
+    file_name = make_filename(impl, theta, mu, makedir=not dry_run)
     file = File(file_name)  # .vtu files will have the same prefix
 
     w = Function(W)

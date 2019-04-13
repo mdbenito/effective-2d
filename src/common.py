@@ -452,7 +452,7 @@ def gather_last_timesteps(experiment_folder: str, experiment_name:
             newd['VTKFile']['Collection']['DataSet'] = []
 
         last_timestep = sorted(d['VTKFile']['Collection']['DataSet'],
-                               key=lambda x: x['@timestep'])[-1]
+                               key=lambda x: int(x['@timestep']))[-1]
         new_timestep = copy.deepcopy(last_timestep)
         new_timestep['@file'] = os.path.join(run_name, new_timestep['@file'])
         new_timestep['@timestep'] = str(timestep)

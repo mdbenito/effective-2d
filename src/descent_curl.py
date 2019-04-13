@@ -325,9 +325,7 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         # Save result into variables for previous timestep and output
         # files and metrics
         if not dry_run:
-            update_displacements(u, z, save=(step % skip == 0) or
-                                            (step < 100 and step % skip//2 == 0),
-                                 step=step)
+            update_displacements(u, z, save=step % skip == 0, step=step)
             
             K = project(sym(grad(z_)), T)
             _run.log_scalar('Kxx', assemble(K[0,0]*dx)/domain_area)
@@ -350,6 +348,10 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         step += 1
         t.update()
 
+    # If we didn't just save, then do it now
+    if (step-1) % skip != 0:
+        update_displacements(u, z, save=True, step=step)
+    
     if step < max_steps:
         t.total = step
         t.update()

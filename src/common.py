@@ -375,7 +375,8 @@ def make_filename(experiment_name: str, theta: float, mu: float,
                          (e.g. for multiple values of theta)
         theta: value of the interpolating parameter
         mu: penalty coefficient
-        makedir: whether to create the necessary path to the destination file
+        makedir: whether to create the necessary path to the destination
+                 file
     Returns
     -------
         Full path to PVD file.
@@ -389,9 +390,10 @@ def make_filename(experiment_name: str, theta: float, mu: float,
 
 def recursively_intersect(msh: Mesh, subdomain: FacetFunction,
                           pt: Point, mark: int, recurr: int = 1):
-    """ Finds the cell(s) containing a point and fills a FacetFunction marking all their
-    facets for use with Dirichlet boundary conditions. It can recursively iterate through
-    neighbouring cells marking their facets as well.
+    """Finds the cell(s) containing a point and fills a FacetFunction
+    marking all their facets for use with Dirichlet boundary
+    conditions. It can recursively iterate through neighbouring cells
+    marking their facets as well.
 
 
     Parameters
@@ -400,12 +402,14 @@ def recursively_intersect(msh: Mesh, subdomain: FacetFunction,
     subdomain: The FacetFunction to return.
     pt: a Point in the domain.
     mark: the value that the FacetFunction will take on the facets found.
-    recurr: set to 0 to mark one cell. If `recurr` > 0, recursively process
-            neighbouring cells, up to `recurr` levels. If < 0, don't mark anything.
+    recurr: set to 0 to mark one cell. If `recurr` > 0, recursively
+            process neighbouring cells, up to `recurr` levels. If < 0,
+            don't mark anything.
 
     Returns
     -------
     Nothing. The output is in `subdomain`.
+
     """
 
     if recurr < 0:
@@ -445,7 +449,8 @@ def gather_last_timesteps(experiment_folder: str, experiment_name:
         if not os.path.isdir(os.path.join(base_path, run_name)):
             continue
         with open(os.path.join(base_path, run_name,
-                               os.path.basename(run_name) + '--.pvd')) as fd:
+                               os.path.basename(run_name) + '--.pvd'),
+                  "rt") as fd:
             d = xmltodict.parse(fd.read())
         if not newd:
             newd = copy.deepcopy(d)

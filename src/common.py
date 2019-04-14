@@ -450,7 +450,7 @@ def gather_last_timesteps(experiment_folder: str, experiment_name: str,
     for run_name in sorted(os.listdir(base_path)):
         try:
             with open(os.path.join(base_path, run_name,
-                                   os.path.basename(run_name) + '--.pvd'),
+                                   os.path.basename(run_name) + '-.pvd'),
                       "rt") as fd:            
                 d = xmltodict.parse(fd.read())
             if not newd:

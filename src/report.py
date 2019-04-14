@@ -39,13 +39,14 @@ class MongoData(object):
                 {'name': 'init', 'title': 'Initial data'},
                 {'name': 'theta', 'title': 'theta', 'type': 'number'},
                 {'name': 'mu', 'title': 'mu', 'type': 'number'},
-                {'name': 'e_stop', 'title': 'eps order', 'type': 'number'},
+                {'name': 'hmin_power', 'title': 'h^', 'type': 'number'},
+                {'name': 'e_stop', 'title': 'eps', 'type': 'number'},
                 # {'name': 'steps', 'title': 'Steps', 'type': 'number', 'filterable': False},
                 {'name': 'time', 'title': 'Duration', 'type': 'time', 'filterable': False},
                 {'name': 'plot', 'title': '', 'type': 'html', 'filterable': False},
                 {'name': 'results', 'type': 'html', 'breakpoints': 'all',
-                 'title': 'results file:', 'filterable': False},
-                {'name': 'mesh', 'title': 'Mesh file', 'breakpoints': 'all'},
+                 'title': 'Results file:', 'filterable': False},
+                {'name': 'mesh', 'title': 'Mesh file:', 'breakpoints': 'all'},
                 {'name': 'select', 'title': '', 'filterable': False}]
         return json.dumps(cols)
 
@@ -66,11 +67,12 @@ class MongoData(object):
             
             row_data = {}
             row_data['exp_name'] = e.experiment.name
-            row_data['form_name'] = conf.qform
+            row_data['form_name'] = conf.qform[:4]
             row_data['init'] = conf.init
             # row_data['steps'] = e....?
             row_data['theta'] = round(conf.theta, 3)
             row_data['mu'] = round(mu, 2)
+            row_data['hmin_power'] = round(conf.hmin_power, 1)
             row_data['e_stop'] = int(log10(conf.e_stop_mult)) - 1
             try:
                 tt = (e.stop_time - e.start_time).seconds

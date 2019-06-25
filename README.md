@@ -78,7 +78,7 @@ as `/home/fenics/lvk/src`. To see command line options, from that
 location, run
 
 ```
-python3 descent-curl.py help
+python3 descent_curl.py help
 ```
 
 Parameters can be changed in the command line using `with`. Parallel
@@ -87,10 +87,21 @@ so on. Please read [sacred's
 documentation](https://sacred.readthedocs.io/en/latest/quickstart.html)
 for more on how to use the command line interface.
 
+For example, if you want to run the default experiment in parallel,
+the following will open a shell in a container and run the experiment
+on a rectangular grid, using 12 cores (but see the known issues below):
+```
+docker exec -it -u fenics lvk_compute_1 bash
+cd lvk/src
+python3 descent_curl.py parallel with max_jobs=12 \
+                                      'mesh_type="rectangle"'
+```
+
 In order to tear down all containers:
 ```
 cd docker && sudo docker-compose -p lvk down
 ```
+
 This leaves the experiment database as a docker volume in the system,
 as well as the VTK files for ParaView under `output/`.
 

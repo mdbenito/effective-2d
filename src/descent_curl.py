@@ -105,9 +105,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         max_line_search_steps: 
         max_steps: Fallback maximum number of steps for gradient descent.
         skip: save displacements every so many steps.
-        save_funs: Whether to store the last values of the solutions and updates
-                   in the returned dictionary (useful for plotting in a notebook
-                   but useless for pickling)
+        save_funs: Whether to save the last values of the solutions and updates
+                   to disk
         debug_fun: set to noop or print
         n: index of run in a parallel computation for the displaying of progress
             bars
@@ -336,12 +335,12 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
             # HACK: go back to functions over subspaces
             u, z = w.split()
 
+        # Save result into variables for previous timestep
         w_.vector()[:] = w.vector()
         u_, z_ = w_.split()
 
         #####
-        # Save result into variables for previous timestep and output
-        # files and metrics
+        # output files and metrics
         if not dry_run and step % skip == 0:
             update_displacements(u, z, save=True, step=step)
             log_scalars(step, z_, disp, cur_energy, ndu, ndz, alpha)
@@ -386,7 +385,7 @@ def job(config_updates: dict):
     r = ex.run(config_updates=config_updates)
     return r.result
 
-
+# FIXME: Use _config instead of passing parameters and extra_args
 @ex.command(unobserved=True) # Do not create a DB entry for this launcher
 def parallel(max_jobs: int=12, theta_values: list=None, dry_run: bool=False,
              extra_args: dict=None):

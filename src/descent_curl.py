@@ -135,6 +135,8 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
         symmetry = circular_symmetry
     elif mesh_file.lower().find('rectangle') >= 0:
         symmetry = rectangular_symmetry
+    elif mesh_file.lower().find('triangle') >= 0:
+        symmetry = triangular_symmetry
     else:
         raise ValueError("Unsupported mesh geometry for symmetry calculation")
     

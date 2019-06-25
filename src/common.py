@@ -10,7 +10,7 @@ import copy
 
 
 __all__ = ["make_initial_data_mixed", "make_initial_data_penalty",
-           "circular_symmetry", "rectangular_symmetry",
+           "circular_symmetry", "rectangular_symmetry", "triangular_symmetry",
            "center_function", "compute_potential", "load_results",
            "save_results", "generate_mesh", "eps",
            "symmetrise_gradient", "frobenius_form", "isotropic_form",
@@ -118,6 +118,26 @@ def rectangular_symmetry(disp: Function) -> float:
     return a / b
     
 rectangular_symmetry.pts = None
+
+
+def triangular_symmetry(disp: Function) -> float:
+    """ Computes the quotient of the lengths of the diagonals of the
+        triangular mesh.
+
+        HACK: should have just one symmetry function. Also this is coupled
+        to the mesh generating function (no discovery of corners)
+    """
+    if triangular_symmetry.pts is None:
+        x, y = np.cos(np.pi/6), np.sin(np.pi/6)
+        triangular_symmetry.pts = [Point(0, 1), Point(-x, -y), Point(x, -y)]
+
+    newpts = [p.array()+disp(p) for p in triangular_symmetry.pts]
+    a = np.linalg.norm(newpts[0] - newpts[1])
+    b = np.linalg.norm(newpts[1] - newpts[2])
+    c = np.linalg.norm(newpts[2] - newpts[0])
+    return np.max((a,b,c)) / np.min((a,b,c))
+    
+triangular_symmetry.pts = None
 
 
 def center_function(f: Function, dim: int = None, measure: float = None) -> None:
@@ -318,8 +338,9 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
 
     Parameters
     ----------
-        kind: 'circle' or 'rectangle'
-        m: number of subdivisions for circle. Ignored for rectangle
+        kind: 'circle', 'rectangle', 'triangle' (equilateral, circunscribed
+              in the unit circumference)
+        m: number of subdivisions for circle. Ignored for other types
         n: number of refinements for generation.
 
     """
@@ -330,8 +351,11 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
         if kind.lower() == 'circle':
             domain = mshr.Circle(Point(0.0, 0.0), 1, m)
         elif kind.lower() == 'rectangle':
-            domain = mshr.Polygon([Point(-1,-1), Point(1, -1),
+            domain = mshr.Polygon([Point(-1, -1), Point(1, -1),
                                    Point(1, 1), Point(-1, 1)])
+        elif kind.lower() == 'triangle':
+            x, y = np.cos(np.pi/6), np.sin(np.pi/6)
+            domain = mshr.Polygon([Point(0, 1), Point(-x, -y), Point(x, -y)])
         else:
             raise TypeError('Unhandled mesh type "%s"' % kind)
 

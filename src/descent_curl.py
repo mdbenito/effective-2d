@@ -59,7 +59,7 @@ def current_config():
     mesh_n = 60
     dirichlet_size = 0
     mu_scale = 1.0
-    hmin_power = 1.5  # mu = mu_scale / msh.hmin()**hmin_power
+    hmin_power = 0.5  # mu = mu_scale / msh.hmin()**hmin_power
     deg = 1
     projection = True
     e_stop_mult = 1e-8

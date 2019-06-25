@@ -33,6 +33,7 @@ services:
     tty: true
     stdin_open: true
     volumes:
+      - ../meshes:/home/fenics/lvk/meshes
       - ../output:/home/fenics/lvk/output
       - ../src:/home/fenics/lvk/src
     depends_on:
@@ -44,6 +45,7 @@ services:
       dockerfile: docker/Dockerfile
     command: ["fenics-notebook"]
     volumes:
+      - ../meshes:/home/fenics/lvk/meshes
       - ../output:/home/fenics/lvk/output
       - ../src:/home/fenics/lvk/src
     ports:
@@ -61,6 +63,7 @@ services:
       - FLASK_APP=/home/fenics/lvk/src/report.py
       - FLASK_ENV=production
     volumes:
+      - ../meshes:/home/fenics/lvk/meshes
       - ../output:/home/fenics/lvk/output
       - ../src:/home/fenics/lvk/src    
     ports:

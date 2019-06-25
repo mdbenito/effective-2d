@@ -94,8 +94,12 @@ on a rectangular grid, using 12 cores (but see the known issues below):
 docker exec -it -u fenics lvk_compute_1 bash
 cd lvk/src
 python3 descent_curl.py parallel with max_jobs=12 \
-                                      'mesh_type="rectangle"'
+                                      extra_args="{'mesh_type': 'rectangle'}"
 ```
+
+Note how when using `parallel` one needs to pass any arguments to the
+experiment with the `extra_args` dictionary. This is a hack which
+should be fixed.
 
 In order to tear down all containers:
 ```
@@ -123,7 +127,9 @@ system (e.g. adding mime types and handlers for xdg-open)
 
 Additionally, the notebooks provide some basic code to query the
 results database and create plots across the range of values of theta
-tested in the experiments. See `src/explore.ipynb`.
+tested in the experiments. See `src/explore.ipynb`. Scroll down to the
+bottom of that notebook for a few helper routines, e.g. to delete a
+collection of experiments.
 
 **Disclaimer:** The report server is by far not the _definitive_
 dashboard, but it was fun and quick to do.  The nice jQuery table in

@@ -13,7 +13,7 @@ services:
       - mongo-data:/data/db
 
   omniboard:
-    image: vivekratnavel/omniboard:1.5.0
+    image: vivekratnavel/omniboard:1.7.1
     command: ["-m", "mongo:27017:lvk"]
     environment:
       - NODE_OPTIONS=--max-old-space-size=4096

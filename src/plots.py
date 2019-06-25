@@ -40,8 +40,7 @@ def plot_one(history: dict, _slice=slice(0,-1), running_mean_window=1):
         _slice = slice(beg, -1)
 
     pl.figure(figsize=(18,12), )
-    pl.suptitle("'%s', $\\theta = %.3e$"
-                % (h['init'], h['theta']))
+    pl.suptitle("'%s', $\\theta = %.3e$" % (h['init'], h['theta']))
     pl.subplot(3,2,1)
     pl.plot(running(h['du'][_slice], running_mean_window))
     pl.title('$d_{t}u$, window: %d' % running_mean_window)
@@ -113,14 +112,14 @@ def plots3(run: dict, begin: float = 0.0, end: float = np.inf):
     pl.ylabel("J")
 
 
-def plot_many(runs, _slice=slice(0, -1), running_mean_window=1) -> None:
-    """
+def plot_many(runs: list, _slice: slice=slice(0, -1), running_mean_window: int=None):
+    """ Plot multiple runs jointly. Used for reports.
 
     Parameters
     ----------
-    runs
-    _slice
-    running_mean_window
+        runs:
+        _slice:
+        running_mean_window:
     """
 
     _runs = sorted(runs, key=lambda x: x['theta'])

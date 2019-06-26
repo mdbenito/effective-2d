@@ -1,6 +1,7 @@
 from dolfin import *
 import numpy as np
 import os
+import shutil
 import pickle as pk
 import mshr
 import uuid
@@ -448,28 +449,36 @@ def recursively_intersect(msh: Mesh, subdomain: FacetFunction,
         for vidx in c.entities(0):
             v = Vertex(msh, vidx)
             if recurr > 0:
-                recursively_intersect(msh, subdomain, v.point(), mark, recurr=recurr - 1)
+                recursively_intersect(msh, subdomain, v.point(), mark,
+                                      recurr=recurr - 1)
                 
 # msh = Mesh(mesh_file)
 # subdomain = FacetFunction("uint", msh, 0)
 # recursively_intersect(msh, subdomain, Point(0,0), 1)
 
-
 def gather_last_timesteps(experiment_folder: str, experiment_name: str,
-                          destination_name: str="auto") -> str:
-
+                          destination_name: str="auto",
+                          copy_files: bool=False) -> str:
     """ Creates a PVD file out of the last timesteps of a series of runs.
     Parameters
     ----------
         experiment_folder: Typically '../output'
         experiment_name: The unique identifier for the experiment,
                          e.g. 'bf327ac'
+        destination_name: either "auto" or a string for the basename of the PVD file
+        copy_files: set to True if you wish the VTK frames to be copied to a separate
+                    folder (e.g. to compress and send)
     Returns
     -------
         Path to the generated PVD file
     """
     newd = None
     base_path = os.path.join(experiment_folder, experiment_name)
+    if destination_name.lower() == "auto":
+        destination_name = "full_run-" + experiment_name
+    if copy_files:
+        os.makedirs(os.path.join(base_path, destination_name), exist_ok=True)
+    
     timestep = 0
     for run_name in sorted(os.listdir(base_path)):
         try:
@@ -484,7 +493,17 @@ def gather_last_timesteps(experiment_folder: str, experiment_name: str,
             last_timestep = sorted(d['VTKFile']['Collection']['DataSet'],
                                    key=lambda x: int(x['@timestep']))[-1]
             new_timestep = copy.deepcopy(last_timestep)
-            new_timestep['@file'] = os.path.join(run_name, new_timestep['@file'])
+            if copy_files:
+                shutil.copyfile(os.path.join(base_path, run_name,
+                                             last_timestep['@file']),
+                                os.path.join(base_path, destination_name,
+                                             last_timestep['@file']))
+                new_timestep['@file'] = os.path.join(destination_name,
+                                                     last_timestep['@file'])
+            else:
+                new_timestep['@file'] = os.path.join(run_name,
+                                                     last_timestep['@file'])
+                
             new_timestep['@timestep'] = str(timestep)
 
             newd['VTKFile']['Collection']['DataSet'].append(new_timestep)
@@ -493,9 +512,9 @@ def gather_last_timesteps(experiment_folder: str, experiment_name: str,
             timestep += 1
         except (FileNotFoundError, NotADirectoryError):
             continue
-    if destination_name.lower() == "auto":
-        destination_name = "full_run-" + experiment_name
+
     output_filename = os.path.join(base_path, destination_name + '.pvd')
     with open(output_filename, "wt") as fd:
         fd.write(xmltodict.unparse(newd, pretty=True, short_empty_elements=True))
         return output_filename
+

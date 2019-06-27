@@ -130,6 +130,8 @@ def triangular_symmetry(disp: Function) -> float:
     """
     if triangular_symmetry.pts is None:
         x, y = np.cos(np.pi/6), np.sin(np.pi/6)
+        # FIXME: this only works for the equilateral. We depend on generate_mesh()
+        # being called and filling triangular_symmetry.pts for us
         triangular_symmetry.pts = [Point(0, 1), Point(-x, -y), Point(x, -y)]
 
     newpts = [p.array()+disp(p) for p in triangular_symmetry.pts]
@@ -339,8 +341,10 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
 
     Parameters
     ----------
-        kind: 'circle', 'rectangle', 'triangle' (equilateral, circunscribed
-              in the unit circumference)
+        kind: 'circle', 'rectangle', 'triangleN', where N is the ratio of
+              height to base and N an integer, which if ommitted is
+              interpreted to mean an equilateral triangle, inscribed in the
+              unit circle (note that the ratio is not 1 in this case)
         m: number of subdivisions for circle. Ignored for other types
         n: number of refinements for generation.
 
@@ -354,9 +358,12 @@ def generate_mesh(kind:str, m:int, n:int) -> str:
         elif kind.lower() == 'rectangle':
             domain = mshr.Polygon([Point(-1, -1), Point(1, -1),
                                    Point(1, 1), Point(-1, 1)])
-        elif kind.lower() == 'triangle':
+        elif kind.lower()[:8] == 'triangle':
+            c = int(kind[8:]) if len(kind) >= 9 else None
             x, y = np.cos(np.pi/6), np.sin(np.pi/6)
-            domain = mshr.Polygon([Point(0, 1), Point(-x, -y), Point(x, -y)])
+            p = 1 if c is None else 2*c*x - y
+            triangular_symmetry.pts = [Point(0, p), Point(-x, -y), Point(x, -y)]
+            domain = mshr.Polygon(triangular_symmetry.pts) 
         else:
             raise TypeError('Unhandled mesh type "%s"' % kind)
 

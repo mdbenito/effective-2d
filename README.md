@@ -167,17 +167,47 @@ Displacement fields are stored as collections of `vtu` files, indexed
 by a `pvd` file. In paraview, after opening one of the latter, only
 two filters are necessary in the visualization pipeline in order to
 see the output:
- 1. **Calculator** to de-scale the displacements. Recall that in-plane
+
+1. **Calculator** to de-scale the displacements. Recall that in-plane
   displacements scale with the square of the plate's thickness $h$ whereas
   out-of-plane do linearly with it: $u_h = h^2 u, v_h = h v$
   Physically meaningful values like $h = 0.01$ mean that one can't see anything
-  in the plot, so that in the end one needs e.g. $h = 0.3$. The expression for the
-  output is: 
+  in the plot, so that in the end one needs e.g. $h = 0.3$. The expression for
+  the output is: 
   ```
   (0.3^2*disp_X)*iHat + (0.3^2*disp_Y)*jHat + (0.3*disp_Z)*kHat
   ```
- 2. **Warp by vector** to see the displacement.
+2. **Warp by vector** to see the displacement.
+ 
+When displaying full runs (as collected by `gather_last_timesteps()` in
+`common.py`) the following filter pipeline can be applied, assuming that
+the increment in theta across timesteps is constant and equal to 5:
 
+1. **Programmable filter** with the following code:
+   ```python
+   h = 0.05
+   t_index = int(inputs[0].GetInformation().Get(vtk.vtkDataObject.DATA_TIME_STEP()))
+   theta_increment = 5.0
+   theta = 1.0 + t_index * theta_increment
+   #print(theta)
+
+   dd = inputs[0].PointData["disp"]
+   dd[:,0] *= theta*h**2
+   dd[:,1] *= theta*h**2
+   dd[:,2] *= sqrt(theta)*h
+   output.PointData.append(dd, "descaled")
+   ```
+   This filter will take the current timestep, compute the corresponding
+   theta and use it to descale displacements.
+2. **Warp by vector** to see the displacement. Use the input "descaled".
+3. **Annotate time** with format `theta: %.0f`, `shift = 1` and
+   `scale  = 5`
+
+Note that as theta increases the displacements do so in such manner that
+it is difficult to observe the difference between spherical minimisers
+and cylindrical ones. For this reason, the scaling with theta should be
+deactivated to observe this phenomenon
+ 
 
 ## Things to do that ~~probably~~ won't happen
 

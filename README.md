@@ -184,7 +184,7 @@ When displaying full runs (as collected by `gather_last_timesteps()` in
 the increment in theta across timesteps is constant and equal to 5:
 
 1. **Programmable filter** with the following code:
-   ```python
+   ```
    h = 0.05
    t_index = int(inputs[0].GetInformation().Get(vtk.vtkDataObject.DATA_TIME_STEP()))
    theta_increment = 5.0

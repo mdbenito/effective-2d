@@ -36,7 +36,8 @@ import numpy as np
 import os
 from tqdm import tqdm
 from common import *
-from time import time
+from time import time, sleep
+from random import random
 
 from uuid import uuid4
 from sacred import Experiment
@@ -71,6 +72,8 @@ def current_config():
     n = 0
     dry_run = False
 
+
+# FIXME: Use _config and document all parameters in current_config()
 @ex.main
 def run_model(_log, _run, init: str, qform: str, mesh_type: str,
               mesh_m: int, mesh_n: int, theta: float, mu_scale: float
@@ -155,12 +158,13 @@ def run_model(_log, _run, init: str, qform: str, mesh_type: str,
     T = TensorFunctionSpace(msh, 'DG', 0)
 
     if projection:
+        # HACK HACK HACK, inefficient, this sucks
         # Removing the antisymmetric part of the gradient requires
         # constructing functions in subspaces of W, which does not
-        # work because of dof orderings A solution is to collapse()
+        # work because of dof orderings. A solution is to collapse()
         # the subspaces, but again dof ordering is not kept. In the
         # end I'll just copy stuff around until I find something
-        # better.  HACK HACK HACK, inefficient, this sucks
+        # better.
         fa_u2w = FunctionAssigner(W.sub(0), U)
         fa_z2w = FunctionAssigner(W.sub(1), Z)
         fa_w2u = FunctionAssigner(U, W.sub(0))
@@ -380,6 +384,9 @@ def job(config_updates: dict):
     future as it can't be pickled. I am curious to hear you
     experiences.
     """
+
+    # HACK: mitigate weird race conditions of FEniCS while compiling forms
+    sleep(3*random())  # 3*seconds uniformly sampled from (0,1)
 
     if not config_updates['dry_run'] and not ex.observers:
         ex.observers.append(MongoObserver.create(url='mongo:27017',
